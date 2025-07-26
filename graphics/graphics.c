@@ -12,9 +12,11 @@ void drawPoint(point2d_t start, color_t *color, framebuffer_t* framebuffer) {
 /**
  * see Bresenham's line algorithm from https://www.cs.montana.edu/courses/spring2009/425/dslectures/Bresenham.pdf
  */
-void draw2d_line(point2d_t start, point2d_t end, color_t* color, framebuffer_t* framebuffer) {
+void draw2d_line(line2d_t line, color_t* color, framebuffer_t* framebuffer) {
   float x, y;
 
+  point2d_t start = line.start;
+  point2d_t end = line.end;
   /* vertical line */
   if (0 == (end.x - start.x)) {
     for (x = start.x, y = start.y; y < end.y; y++) {
