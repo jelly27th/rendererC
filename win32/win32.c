@@ -88,18 +88,22 @@ void createScreen(windows_t* window) {
 }
 
 /*
-    |-------------->x
-    |
-    |
-    |
-    v y
- */
+     y ^                       |------------->x   
+       |                       |   
+       |                -->    |
+       |                       |
+       |------------>x         v y   
+*/
 void drawScreen(windows_t* window, framebuffer_t* framebuffer) {
-  for (int i = 0; i < window->width * window->height; i++) {
-    window->framebuffer[i].rgbBlue = framebuffer->color_buffer[i].b;
-    window->framebuffer[i].rgbGreen = framebuffer->color_buffer[i].g;
-    window->framebuffer[i].rgbRed = framebuffer->color_buffer[i].r;
-    window->framebuffer[i].rgbReserved = framebuffer->color_buffer[i].a;
+  for (int x = 0; x < window->width; x++) {
+    for (int y = 0; y < window->height; y++) {
+      int worldPos = window->width * y + x;
+      int devicePos = window->width * (window->height - y) + x;
+      window->framebuffer[devicePos].rgbBlue = framebuffer->color_buffer[worldPos].b;
+      window->framebuffer[devicePos].rgbGreen = framebuffer->color_buffer[worldPos].g;
+      window->framebuffer[devicePos].rgbRed = framebuffer->color_buffer[worldPos].r;
+      window->framebuffer[devicePos].rgbReserved = framebuffer->color_buffer[worldPos].a;
+    }
   }
 }
 
