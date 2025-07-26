@@ -21,12 +21,9 @@ int main() {
 
     /* Render your scene here start */
     color_t color = {255, 0, 0, 255}; // Red color
-    for (int i = 0; i < framebuffer->width; i++) {
-      for (int j = 0; j < framebuffer->height; j++) {
-        point2d_t p = {i, 1};
-        drawPoint(p, &color, framebuffer);
-      }
-    }
+    line2d_t line = {{400, 500}, {700, 100}};
+    draw2d_Line(line, &color, framebuffer);
+
     /* Render your scene here end */
     drawScreen(window, framebuffer);
     fillScreen(window);

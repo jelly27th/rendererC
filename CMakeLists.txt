@@ -5,6 +5,7 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
 set(HEADER_FILES
+    utils/utils.h
     vector/vector.h
     color/color.h
     point/point.h
@@ -14,6 +15,7 @@ set(HEADER_FILES
 )
 
 set(SOURCE_FILES
+    utils/utils.c
    framebuffer/framebuffer.c
    graphics/graphics.c
    win32/win32.c

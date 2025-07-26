@@ -98,7 +98,7 @@ void drawScreen(windows_t* window, framebuffer_t* framebuffer) {
   for (int x = 0; x < window->width; x++) {
     for (int y = 0; y < window->height; y++) {
       int worldPos = window->width * y + x;
-      int devicePos = window->width * (window->height - y) + x;
+      int devicePos = window->width * (window->height - y - 1) + x;
       window->framebuffer[devicePos].rgbBlue = framebuffer->color_buffer[worldPos].b;
       window->framebuffer[devicePos].rgbGreen = framebuffer->color_buffer[worldPos].g;
       window->framebuffer[devicePos].rgbRed = framebuffer->color_buffer[worldPos].r;
