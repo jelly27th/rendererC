@@ -21,6 +21,7 @@ set(SOURCE_FILES
    win32/win32.c
 )
 
-set(SRC_CUR main.c)
+# set(SRC_CUR main.c)
+set(SRC_CUR pmxRead.c)
 add_executable(Renderer ${HEADER_FILES} ${SRC_CUR}  
                           ${SOURCE_FILES})
