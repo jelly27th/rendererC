@@ -48,7 +48,7 @@ void read_file(char *filename)
         exit(1);        //出错、退出
     }
 
-    // fread(&buffer,sizeof(buffer),1,fd);
+
     fread(&(pmx.sign[0]), sizeof(pmx.sign), 1, fd);
 
     fread(&(pmx.version), sizeof(pmx.version), 1, fd);
@@ -78,12 +78,21 @@ void read_file(char *filename)
     fread(pmx.generalModelComment.data_wide, pmx.generalModelComment.len, 1, fd);
     pmx.generalModelComment.data_wide[pmx.generalModelComment.len / 2] = L'\0'; // Null-terminate the string
     wprintf(L"General Model Comment: %ls\n", pmx.generalModelComment.data_wide);
+
+    fread(&(pmx.vertex.count), sizeof(pmx.vertex.count), 1, fd);
+    pmx.vertex.size = 3 * 4 + 3 * 4 + 2 * 4;
+    if (pmx.goalType[1] !=0 ) {
+      pmx.vertex.size += 4 * 4 * pmx.goalType[1];
+    }
+    pmx.vertex.size += 1;
+
+    fread(&buffer[0],sizeof(buffer),1,fd);
     fclose(fd);
 }
 
 int main()
 {
-    read_file("C:\\Users\\dong\\Downloads\\xiao\\xiao.pmx");
+  read_file("C:\\Users\\dong\\Downloads\\xiao\\xiao.pmx");
 
-    return 0;
+  return 0;
 }
