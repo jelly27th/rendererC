@@ -9,6 +9,8 @@ typedef  unsigned int uint32_t;
 typedef  unsigned long long uint64_t;
 typedef  float float32_t;
 typedef  double float64_t;
+typedef  short int16_t;
+typedef  int   int32_t;
 
 typedef struct
 {
@@ -18,8 +20,53 @@ typedef struct
 
 typedef struct
 {
+    uint8_t bdef_Type1;// 1 byte for BDEF1 type 1
+    uint16_t bdef_Type2; // 2 bytes for BDEF1 type 2
+    uint32_t bdef_Type4; // 4 bytes for BDEF1 type 4
+} pmx_BDEF1_t;
+
+typedef struct
+{
+    uint8_t bdef_Type1[2]; // 2 bytes for BDEF2 type 1
+    uint16_t bdef_Type2[2]; // 4 bytes for BDEF2 type 2
+    uint32_t bdef_Type4[2]; // 8 bytes for BDEF2 type 4
+} pmx_BDEF2_t;
+
+typedef struct
+{
+    uint8_t bdef_Type1[20]; // 20 bytes for BDEF4 type 1
+    uint8_t bdef_Type2[24]; // 24 bytes for BDEF4 type 2
+    uint8_t bdef_Type4[32]; // 32 bytes for BDEF4 type 4
+} pmx_BDEF4_t;
+typedef struct
+{
+    uint8_t sdef_Type1[40+2]; // 42 bytes for SDEF type 1
+    uint8_t sdef_Type2[40+4]; // 44 bytes for SDEF type 2
+    uint8_t sdef_Type4[40+8]; // 48 bytes for SDEF type 4
+} pmx_SDEF_t;
+
+typedef struct
+{
+    uint8_t qdef_Type1[16+4];
+    uint8_t qdef_Type2[16+8];
+    uint8_t qdef_Type4[16+16];
+} pmx_QDEF_t;
+typedef struct
+{
+    float32_t position[3]; // Vertex position (x, y, z)
+    float32_t normal[3];   // Vertex normal (nx, ny, nz)
+    float32_t uv[2];       // Texture coordinates (u, v)
+    float32_t* additionalData; // Additional data for vec4 if applicable
+    uint8_t weightType;    // Weight type: 0=BDEF1, 1=BDEF2, 2=BDEF4, 3=SDEF, 4=QDEF
+    uint8_t* variableWeight; // Variable weight data for BDEF2, BDEF4, SDEF, or QDEF
+    float32_t edgeMagnification; // Edge magnification factor
+
+} pmx_vertex_data_t;
+typedef struct
+{
     uint32_t count;
     uint32_t size;
+    pmx_vertex_data_t* data; // Pointer to vertex data
 } pmx_vertex_t;
 
 typedef struct
@@ -80,13 +127,14 @@ void read_file(char *filename)
     wprintf(L"General Model Comment: %ls\n", pmx.generalModelComment.data_wide);
 
     fread(&(pmx.vertex.count), sizeof(pmx.vertex.count), 1, fd);
-    pmx.vertex.size = 3 * 4 + 3 * 4 + 2 * 4;
+    pmx.vertex.size = 3 * 4 + 3 * 4 + 2 * 4; //32 position, normal, and UV coordinates
     if (pmx.goalType[1] !=0 ) {
-      pmx.vertex.size += 4 * 4 * pmx.goalType[1];
+      pmx.vertex.size += 4 * 4 * pmx.goalType[1]; // Additional data for vec4
     }
-    pmx.vertex.size += 1;
+    pmx.vertex.size += 1; // variable weight type 0=BDEF1，1=BDEF2，2=BDEF4，3=SDEF，4=QDEF
 
     fread(&buffer[0],sizeof(buffer),1,fd);
+    printf("Read %d bytes from file.\n", buffer[33]);
     fclose(fd);
 }
 
