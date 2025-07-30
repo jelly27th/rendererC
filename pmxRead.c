@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <locale.h>
+#include "vector/vector.h"
 
 typedef  unsigned char uint8_t;
 typedef  unsigned short uint16_t;
@@ -17,69 +18,146 @@ typedef struct
     uint32_t len;
     wchar_t *data_wide; // For wide character support
 } pmx_text_t;
-
-typedef struct
-{
-    uint8_t bdef_Type1;// 1 byte for BDEF1 type 1
-    uint16_t bdef_Type2; // 2 bytes for BDEF1 type 2
-    uint32_t bdef_Type4; // 4 bytes for BDEF1 type 4
-} pmx_BDEF1_t;
-
-typedef struct
-{
-    uint8_t bdef_Type1[2]; // 2 bytes for BDEF2 type 1
-    uint16_t bdef_Type2[2]; // 4 bytes for BDEF2 type 2
-    uint32_t bdef_Type4[2]; // 8 bytes for BDEF2 type 4
-} pmx_BDEF2_t;
-
-typedef struct
-{
-    uint8_t bdef_Type1[20]; // 20 bytes for BDEF4 type 1
-    uint8_t bdef_Type2[24]; // 24 bytes for BDEF4 type 2
-    uint8_t bdef_Type4[32]; // 32 bytes for BDEF4 type 4
-} pmx_BDEF4_t;
-typedef struct
-{
-    uint8_t sdef_Type1[40+2]; // 42 bytes for SDEF type 1
-    uint8_t sdef_Type2[40+4]; // 44 bytes for SDEF type 2
-    uint8_t sdef_Type4[40+8]; // 48 bytes for SDEF type 4
-} pmx_SDEF_t;
-
-typedef struct
-{
-    uint8_t qdef_Type1[16+4];
-    uint8_t qdef_Type2[16+8];
-    uint8_t qdef_Type4[16+16];
-} pmx_QDEF_t;
-typedef struct
-{
-    float32_t position[3]; // Vertex position (x, y, z)
-    float32_t normal[3];   // Vertex normal (nx, ny, nz)
-    float32_t uv[2];       // Texture coordinates (u, v)
-    float32_t* additionalData; // Additional data for vec4 if applicable
-    uint8_t weightType;    // Weight type: 0=BDEF1, 1=BDEF2, 2=BDEF4, 3=SDEF, 4=QDEF
-    uint8_t* variableWeight; // Variable weight data for BDEF2, BDEF4, SDEF, or QDEF
-    float32_t edgeMagnification; // Edge magnification factor
-
-} pmx_vertex_data_t;
-typedef struct
-{
-    uint32_t count;
-    uint32_t size;
-    pmx_vertex_data_t* data; // Pointer to vertex data
-} pmx_vertex_t;
-
-typedef struct
-{
+typedef struct {
+    
     uint8_t sign[4]; // PMX file signature
     float32_t version; // PMX file version
     uint8_t goalCount; // Number of goals
-    uint8_t goalType[8]; // Goal types
+    
+    uint8_t	encode;	//0:UTF16 1:UTF8
+    uint8_t	addUV4Num;
+    uint8_t	vertexIndexSize;
+    uint8_t	textureIndexSize;
+    uint8_t	materialIndexSize;
+    uint8_t	boneIndexSize;
+    uint8_t	morphIndexSize;
+    uint8_t	rigidbodyIndexSize;
+
     pmx_text_t localModelName; // Local model name
     pmx_text_t generalModelName; // General model name
     pmx_text_t localModelComment; // Local model comment
     pmx_text_t generalModelComment; // General model comment
+} pmx_header_t;
+
+/*
+    BDEF1
+    boneIndices[0]
+
+    BDEF2
+    boneIndices[0-1]
+    boneWeights[0]
+
+    BDEF4
+    boneIndices[0-3]
+    boneWeights[0-3]
+
+    SDEF
+    boneIndices[0-1]
+    boneWeights[0]
+    sdefC
+    sdefR0
+    sdefR1
+
+    QDEF
+    boneIndices[0-3]
+    boneWeights[0-3]
+*/
+typedef enum {
+    BDEF1,
+    BDEF2,
+    BDEF4,
+    SDEF,
+    QDEF,
+}pmx_weight_t;
+typedef struct
+{
+    vector2d_t position[3]; // Vertex position (x, y, z)
+    vector3d_t normal;   // Vertex normal (nx, ny, nz)
+    vector2d_t uv;       // Texture coordinates (u, v)
+    
+    vector4d_t* addUV; // Additional data for vec4 if applicable
+    
+    pmx_weight_t weightType;    // Weight type: 0=BDEF1, 1=BDEF2, 2=BDEF4, 3=SDEF, 4=QDEF
+    int32_t boneIndices[4]; // Bone indices for skinning
+    float32_t boneWeights[4]; // Bone weights for skinning
+    vector3d_t sdefC; // SDEF center
+    vector3d_t sdefR0; // SDEF reference point 0
+    vector3d_t sdefR1; // SDEF reference point 1
+
+    float32_t edgeMag; // Edge magnitude for SDEF
+
+} pmx_vertex_data_t;
+typedef struct {
+    uint32_t count;
+    pmx_vertex_data_t* data; // Pointer to vertex data
+} pmx_vertex_t;
+
+typedef struct {
+    uint32_t indices[3]; // Indices of the face vertices
+} pmx_face_data_t;
+
+typedef struct {
+    uint32_t count; // Number of faces
+    pmx_face_data_t* data; // Pointer to face data
+} pmx_face_t;
+
+typedef struct {
+    pmx_text_t path; // Texture file path
+} pmx_texture_t;
+
+typedef enum {
+    NoCull = 0x01,
+    GroundShadow = 0x02,
+    DrawSelfShadow = 0x04,
+    RecieveSelfShadow = 0x08,
+    DrawEdge = 0x10,
+    VertexColor = 0x20,
+    DrawPoint = 0x40,
+    DrawLine = 0x80,
+} pmx_draw_mode_flags_t;
+
+typedef enum {
+    None,
+    Mul,
+    Add,
+    SubTexture,
+} pmx_blend_mode_t;
+
+typedef enum {
+    external,
+    internal
+} pmx_toon_mode_t;
+
+typedef struct {
+    pmx_text_t localMaterialName; 
+    pmx_text_t generalMaterialName; 
+
+    vector4d_t diffuse; // Diffuse color (RGBA)
+    vector3d_t specular; // Specular color (RGB)
+    float32_t specularPower; // Specular power
+    vector3d_t ambient; // Ambient color (RGB)
+
+    pmx_draw_mode_flags_t drawMode; // Draw mode flags
+
+    vector4d_t edgeColor; // Edge color (RGBA)
+    float32_t edgeRatio; // Edge ratio
+
+    uint32_t textureIndex; // Texture index
+    uint32_t specularTextureIndex; // Sphere texture index
+    pmx_blend_mode_t blendMode; // Toon texture factor
+
+    pmx_toon_mode_t toonMode; // Texture reference type
+    int32_t toonTextureIndex; // Toon texture index
+
+    pmx_text_t memo; // Material memo
+
+    uint32_t numFace; // Number of face vertices
+} pmx_material_t;
+typedef struct {
+    pmx_header_t header; // PMX file header
     pmx_vertex_t vertex; // Vertex data
+    pmx_face_t face; // Face data
+    pmx_material_t material; // Material data
 } pmx_t;
 
 pmx_t pmx;

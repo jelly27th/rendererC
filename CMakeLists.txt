@@ -12,6 +12,8 @@ set(HEADER_FILES
     framebuffer/framebuffer.h
     graphics/graphics.h
     win32/win32.h
+    dyarray/dyarray.h
+    
 )
 
 set(SOURCE_FILES
