@@ -153,11 +153,72 @@ typedef struct {
 
     uint32_t numFace; // Number of face vertices
 } pmx_material_t;
+
+typedef enum {
+    TargetShowMode = 0x0001,
+    AllowRotate = 0x0002,
+    AllowTranslate = 0x0004,
+    Visible = 0x0008,
+    AllowControl = 0x0010,
+    IK = 0x0020,
+    AppendLocal = 0x0080,
+    AppendRotate = 0x0100,
+    AppendTranslate = 0x0200,
+    FixedAxis = 0x0400,
+    LocalAxis = 0x800,
+    DeformAfterPhysics = 0x1000,
+    DeformOuterParent = 0x2000,
+}pmx_bone_flags_t;
+
+typedef struct {
+    int32_t boneIndex; // Bone index
+    unsigned char angleLimit; // Angle limit for the bone
+
+    vector3d_t minLimit; // Minimum angle limit (x, y, z)
+    vector3d_t maxLimit; // Maximum angle limit (x, y, z)
+}pmx_lk_link_t;
+typedef struct {
+    pmx_text_t localBoonName; // Bone name
+    pmx_text_t generalBoonName; // English bone name
+
+    vector3d_t position; // Bone position (x, y, z)
+    int32_t    parentBoneIndex; // Parent bone index
+    int32_t    deformDepth;
+    pmx_bone_flags_t flags[2]; // Bone flags
+
+    /* tail position */
+    vector3d_t tailPosition; // Tail position (x, y, z)
+    int32_t    tailBoneIndex; // Target bone index for IK
+
+    /* Bone Inheritance */
+    int32_t inheritBoneIndex; // Bone index for inheritance
+    float32_t inheritWeight; // Inheritance weight
+
+    /* stationary shaft */ 
+    vector3d_t fixedAxis; // Fixed axis (x, y, z)
+
+    /* Local axis */ 
+    vector3d_t localAxisX; // Local axis X (x, y, z)
+    vector3d_t localAxisY; // Local axis Y (x, y, z
+
+    /* External relatives */ 
+    int32_t externalParentKey; // Key value for external parent deformation
+
+    /* IK */ 
+    int32_t ikTargetBoneIndex; // IK target bone index
+    int32_t ikIterationCount; // IK iteration count
+    float32_t ikLimitAngle; // IK limit angle
+    uint8_t ikLinkCount; // Number of IK links
+    pmx_lk_link_t* ikLinks; // Pointer to IK links
+
+} pmx_bone_t;
+
 typedef struct {
     pmx_header_t header; // PMX file header
     pmx_vertex_t vertex; // Vertex data
     pmx_face_t face; // Face data
     pmx_material_t material; // Material data
+    pmx_bone_t bone; // Bone data
 } pmx_t;
 
 pmx_t pmx;
