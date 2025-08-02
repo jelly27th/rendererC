@@ -213,12 +213,93 @@ typedef struct {
 
 } pmx_bone_t;
 
+typedef	enum {
+    Group,
+    Position,
+    Bone,
+    UV,
+    AddUV1,
+    AddUV2,
+    AddUV3,
+    AddUV4,
+    Material,
+    Flip,
+    Impluse,
+} pmx_morph_type_t;
+
+typedef struct  {
+    int32_t	morphIndex;
+    float	weight;
+}pmx_group_morph_t;
+
+typedef struct {
+    int32_t		vertexIndex;
+    vector3d_t	position;
+}pmx_vertex_morph_t;
+
+typedef struct  {
+    int32_t		boneIndex;
+    vector3d_t	position;
+    vector4d_t	quaternion;
+}pmx_bone_morph_t;
+
+typedef struct {
+    int32_t		vertexIndex;
+    vector4d_t	uv;
+}pmx_uv_morph_t;
+
+typedef enum {
+    Mul,
+    Add,
+}pmx_op_type_t;
+typedef struct  {
+
+    int32_t		materialIndex;
+    pmx_op_type_t	opType;	
+    vector4d_t	diffuse;
+    vector3d_t	specular;
+    float		specularPower;
+    vector3d_t	ambient;
+    vector4d_t	edgeColor;
+    float		edgeSize;
+    vector4d_t	textureFactor;
+    vector4d_t	sphereTextureFactor;
+    vector4d_t	toonTextureFactor;
+}pmx_material_morph_t;
+typedef struct {
+    int32_t	morphIndex;
+    float	m_weight;
+}pmx_flip_morph_t;
+
+typedef struct {
+    int32_t		rigidbodyIndex;
+    uint8_t		localFlag;	//0:OFF 1:ON
+    vector3d_t	translateVelocity;
+    vector3d_t	rotateTorque;
+}pmx_impulse_morph_t;
+typedef struct {
+    pmx_text_t localMorphName; // Morph name
+    pmx_text_t generalMorphName; // English morph name
+
+    uint8_t controlPanel; // Control panel index
+    pmx_morph_type_t morphType; // Morph type
+
+    pmx_vertex_morph_t* positionMorphs; // Position morphs
+    pmx_uv_morph_t* uvMorphs; // UV morphs
+    pmx_bone_morph_t* boneMorphs; // Bone morphs
+    pmx_material_morph_t* materialMorphs; // Material morphs
+    pmx_group_morph_t* groupMorphs; // Group morphs
+    pmx_flip_morph_t* flipMorphs; // Flip morphs
+    pmx_impulse_morph_t* impulseMorphs; // Impulse morphs
+
+} pmx_morph_t;
 typedef struct {
     pmx_header_t header; // PMX file header
     pmx_vertex_t vertex; // Vertex data
     pmx_face_t face; // Face data
     pmx_material_t material; // Material data
     pmx_bone_t bone; // Bone data
+    pmx_morph_t morph; // Morph data
 } pmx_t;
 
 pmx_t pmx;
