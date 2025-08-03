@@ -13,6 +13,7 @@ typedef  double float64_t;
 typedef  short int16_t;
 typedef  int   int32_t;
 
+/* pmx header struct */
 typedef struct
 {
     uint32_t len;
@@ -38,6 +39,8 @@ typedef struct {
     pmx_text_t localModelComment; // Local model comment
     pmx_text_t generalModelComment; // General model comment
 } pmx_header_t;
+
+/* pmx vertex struct*/
 
 /*
     BDEF1
@@ -117,10 +120,10 @@ typedef enum {
 } pmx_draw_mode_flags_t;
 
 typedef enum {
-    None,
-    Mul,
-    Add,
-    SubTexture,
+    blend_None,
+    blend_Mul,
+    blend_Add,
+    blend_SubTexture,
 } pmx_blend_mode_t;
 
 typedef enum {
@@ -249,8 +252,8 @@ typedef struct {
 }pmx_uv_morph_t;
 
 typedef enum {
-    Mul,
-    Add,
+    op_Mul,
+    op_Add,
 }pmx_op_type_t;
 typedef struct  {
 
@@ -473,6 +476,39 @@ typedef struct {
     pmx_softbody_t softbody; // Softbody data
 } pmx_t;
 
+void pmxRead(void* buffer, uint32_t size, FILE* fd) {
+    fread(buffer, size, 1, fd);
+}
+
+void pmxReadString(pmx_text_t* string, FILE* fd) {
+    pmxRead(&(string->len), sizeof(string->len), fd);
+    string->data_wide = (wchar_t *)malloc(sizeof(wchar_t) * (string->len / 2 + 1));
+    pmxRead(string->data_wide, string->len, fd);
+    string->data_wide[string->len / 2] = L'\0'; // Null-terminate the string
+}
+
+void pmxReadHeader(pmx_t* pmx, FILE* fd) {
+    pmxRead(&(pmx->header.sign[0]), sizeof(pmx->header.sign), fd);
+
+    pmxRead(&(pmx->header.version), sizeof(pmx->header.version), fd);
+
+    pmxRead(&(pmx->header.goalCount), sizeof(pmx->header.goalCount), fd);
+
+    pmxRead(&(pmx->header.encode), sizeof(pmx->header.encode), fd);
+    pmxRead(&(pmx->header.addUV4Num), sizeof(pmx->header.addUV4Num), fd);
+    pmxRead(&(pmx->header.vertexIndexSize), sizeof(pmx->header.vertexIndexSize), fd);
+    pmxRead(&(pmx->header.textureIndexSize), sizeof(pmx->header.textureIndexSize), fd);
+    pmxRead(&(pmx->header.materialIndexSize), sizeof(pmx->header.materialIndexSize), fd);
+    pmxRead(&(pmx->header.boneIndexSize), sizeof(pmx->header.boneIndexSize), fd);
+    pmxRead(&(pmx->header.morphIndexSize), sizeof(pmx->header.morphIndexSize), fd);
+    pmxRead(&(pmx->header.rigidbodyIndexSize), sizeof(pmx->header.rigidbodyIndexSize), fd);
+
+    pmxReadString(&pmx->header.localModelName, fd);
+    pmxReadString(&pmx->header.generalModelName, fd);
+    pmxReadString(&pmx->header.localModelComment, fd);
+    pmxReadString(&pmx->header.generalModelComment, fd);
+
+}
 pmx_t pmx;
 unsigned char buffer[65536];
 void read_file(char *filename)
@@ -483,49 +519,20 @@ void read_file(char *filename)
     if(fd == NULL)
     {
         perror("open failed!");
-        exit(1);        //出错、退出
+        exit(1);        //error, exit the program
     }
 
+    pmxReadHeader(&pmx, fd);
 
-    fread(&(pmx.sign[0]), sizeof(pmx.sign), 1, fd);
+    // fread(&(pmx.vertex.count), sizeof(pmx.vertex.count), 1, fd);
+    // pmx.vertex.size = 3 * 4 + 3 * 4 + 2 * 4; //32 position, normal, and UV coordinates
+    // if (pmx.goalType[1] !=0 ) {
+    //   pmx.vertex.size += 4 * 4 * pmx.goalType[1]; // Additional data for vec4
+    // }
+    // pmx.vertex.size += 1; // variable weight type 0=BDEF1，1=BDEF2，2=BDEF4，3=SDEF，4=QDEF
 
-    fread(&(pmx.version), sizeof(pmx.version), 1, fd);
-    
-    fread(&(pmx.goalCount), sizeof(pmx.goalCount), 1, fd);
-    
-    fread(&(pmx.goalType[0]), sizeof(pmx.goalType), 1, fd);
-    
-    fread(&(pmx.localModelName.len), sizeof(pmx.localModelName.len), 1, fd);
-    pmx.localModelName.data_wide = (wchar_t  *)malloc(sizeof(wchar_t ) * (pmx.localModelName.len / 2 + 1));
-    fread(pmx.localModelName.data_wide, pmx.localModelName.len, 1, fd);
-    pmx.localModelName.data_wide[pmx.localModelName.len / 2] = L'\0'; // Null-terminate the string
-    
-    fread(&(pmx.generalModelName.len), sizeof(pmx.generalModelName.len), 1, fd);
-    pmx.generalModelName.data_wide = (wchar_t  *)malloc(sizeof(wchar_t ) * (pmx.generalModelName.len / 2 + 1));
-    fread(pmx.generalModelName.data_wide, pmx.generalModelName.len, 1, fd);
-    pmx.generalModelName.data_wide[pmx.generalModelName.len / 2] = L'\0'; // Null-terminate the string
-    
-    fread(&(pmx.localModelComment.len), sizeof(pmx.localModelComment.len), 1, fd);
-    pmx.localModelComment.data_wide = (wchar_t  *)malloc(sizeof(wchar_t ) * (pmx.localModelComment.len / 2 + 1));
-    fread(pmx.localModelComment.data_wide, pmx.localModelComment.len, 1, fd);
-    pmx.localModelComment.data_wide[pmx.localModelComment.len / 2] = L'\0'; // Null-terminate the string
-    wprintf(L"Local Model Comment: %ls\n", pmx.localModelComment.data_wide);
-    
-    fread(&(pmx.generalModelComment.len), sizeof(pmx.generalModelComment.len), 1, fd);
-    pmx.generalModelComment.data_wide = (wchar_t  *)malloc(sizeof(wchar_t ) * (pmx.generalModelComment.len / 2 + 1));
-    fread(pmx.generalModelComment.data_wide, pmx.generalModelComment.len, 1, fd);
-    pmx.generalModelComment.data_wide[pmx.generalModelComment.len / 2] = L'\0'; // Null-terminate the string
-    wprintf(L"General Model Comment: %ls\n", pmx.generalModelComment.data_wide);
-
-    fread(&(pmx.vertex.count), sizeof(pmx.vertex.count), 1, fd);
-    pmx.vertex.size = 3 * 4 + 3 * 4 + 2 * 4; //32 position, normal, and UV coordinates
-    if (pmx.goalType[1] !=0 ) {
-      pmx.vertex.size += 4 * 4 * pmx.goalType[1]; // Additional data for vec4
-    }
-    pmx.vertex.size += 1; // variable weight type 0=BDEF1，1=BDEF2，2=BDEF4，3=SDEF，4=QDEF
-
-    fread(&buffer[0],sizeof(buffer),1,fd);
-    printf("Read %d bytes from file.\n", buffer[33]);
+    // fread(&buffer[0],sizeof(buffer),1,fd);
+    // printf("Read %d bytes from file.\n", buffer[33]);
     fclose(fd);
 }
 
