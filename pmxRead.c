@@ -293,13 +293,184 @@ typedef struct {
     pmx_impulse_morph_t* impulseMorphs; // Impulse morphs
 
 } pmx_morph_t;
+
+typedef enum {
+    DefaultFrame,
+    SpecialFrame,
+} pmx_frame_type_t;
+
+typedef enum{
+    BoneIndex,
+    MorphIndex,
+} pmx_target_type_t;
+
+typedef struct {
+    pmx_target_type_t targetType; // Target type: BoneIndex or MorphIndex
+    int32_t targetIndex; // Index of the target (bone or morph)
+} pmx_frame_target_t;
+
+typedef struct {
+
+    pmx_text_t localFrameName; // Frame name
+    pmx_text_t generalFrameName; // English frame name
+
+    pmx_frame_type_t frameType; // Frame type
+
+    int32_t frameCount; // Number of targets in the frame
+    pmx_frame_target_t* targets; // Pointer to target data
+
+} pmx_displayFrame_t;
+
+typedef enum {
+    Sphere,
+    Box,
+    Capsule,
+}pmx_rigidShape_t;
+
+typedef enum{
+    Static,
+    Dynamic,
+    DynamicAndBoneMerge
+}pmx_rigidOperation_t;
+typedef struct {
+    pmx_text_t localName; // Local name
+    pmx_text_t generalName; // General name
+
+    int32_t boneIndex; // Bone index
+    uint8_t groupID; // Group index
+    uint16_t collisionGroup; // Collision group index
+
+    pmx_rigidShape_t shape; // Shape type: Sphere, Box, Capsule
+    vector3d_t shapeSize; // Shape size (x, y, z)
+    vector3d_t translate; // Position (x, y, z)
+    vector3d_t rotate; // Rotation (x, y, z in radians)
+
+    float32_t mass; // Mass of the rigid body
+    float32_t translateDimmer; // Damping factor for translation
+    float32_t rotateDimmer; // Damping factor for rotation
+    float32_t repulsion; // Repulsion factor
+    float32_t friction; // Friction factor
+    pmx_rigidOperation_t operation; // Operation type: Static, Dynamic, DynamicAndBoneMerge
+
+} pmx_rigidBody_t;
+
+typedef enum {
+    SpringDOF6,
+    DOF6,
+    P2P,
+    ConeTwist,
+    Slider,
+    Hinge,
+} pmx_jointType_t; // Joint type
+typedef struct {
+    pmx_text_t localJointName; // Joint name
+    pmx_text_t generalJointName; // English joint name
+
+    pmx_jointType_t type; // Joint type
+    int32_t rigidBodyAIndex; // Index of the first rigid body
+    int32_t rigidBodyBIndex; // Index of the second rigid body
+
+    vector3d_t translate; // Translation (x, y, z)
+    vector3d_t rotate; // Rotation (x, y, z)
+
+    vector3d_t translateLowerLimit; // Lower limit for translation (x, y, z)
+    vector3d_t translateUpperLimit; // Upper limit for translation (x, y, z)
+    vector3d_t rotateLowerLimit; // Lower limit for rotation (x, y, z)
+    vector3d_t rotateUpperLimit; // Upper limit for rotation (x, y, z)
+
+    vector3d_t springTranslateFactor; // Spring factor for translation (x, y, z)
+    vector3d_t springRotateFactor; // Spring factor for rotation (x, y, z)
+
+} pmx_joint_t;
+
+typedef enum {
+    TriMesh,
+    Rope,
+}pmx_softbodyType_t;
+
+typedef	enum {
+	BLink = 0x01,
+	Cluster = 0x02,
+	HybridLink = 0x04,
+} pmx_softbodyMask_t; // Softbody mask flags
+
+typedef struct {
+    int32_t rigidBodyIndex; // Index of the rigid body
+    int32_t vertexIndex; // Index of the vertex
+    uint8_t nearMode; // Near mode: 0=FF, 1=ON
+}pmx_anchorRigidbody_t;
+typedef struct {
+    pmx_text_t localSoftbodyName; // Softbody name
+    pmx_text_t generalSoftbodyName; // English softbody name
+
+    pmx_softbodyType_t type; // Softbody type: TriMesh or Rope
+    int32_t materialIndex; // Material index
+    
+    uint8_t group; // Group index
+    uint16_t collisionGroup; // Collision group index
+
+    pmx_softbodyMask_t flag; // Softbody mask flags
+
+    int32_t bLinkLength; // B-Link length
+    int32_t numClusters; // Number of clusters
+
+    float32_t totalMass; // Total mass of the softbody
+    float32_t collisionMargin; // Collision margin
+
+    /*
+        0:V_TwoSided
+        1:V_OneSided
+        2:F_TwoSided
+        3:F_OneSided
+    */
+    int32_t AeroModel; // Aero model type
+
+    float32_t VCF; // Volume conservation factor
+    float32_t DP; // Drag coefficient
+    float32_t DG; // Lift coefficient
+    float32_t LF; // Lift factor
+    float32_t PR; // Pressure factor
+    float32_t VC; // Volume factor
+    float32_t DF; // Dynamic friction factor
+    float32_t MT; // Material factor
+    float32_t CHR; // Cluster hardness
+    float32_t KHR; // Kinematic hardness
+    float32_t AHR; // Aero hardness
+
+    float32_t SRHR_CL; // Softbody rigid hardness
+    float32_t SKHR_CL; // Softbody kinematic hardness
+    float32_t SSHR_CL; // Softbody self hardness
+    float32_t SR_SPLT_CL;
+	float32_t SK_SPLT_CL;
+	float32_t SS_SPLT_CL;
+
+    int32_t V_IT; // Iteration count for volume
+    int32_t P_IT; // Iteration count for pressure
+    int32_t D_IT; // Iteration count for drag
+    int32_t C_IT; // Iteration count for collision
+
+    int32_t LST; // Linear stiffness
+    int32_t AST; // Angular stiffness
+    int32_t VST; // Volume stiffness
+
+    int32_t AnchorRigidbodyCount; // Number of anchor rigidbodies
+    pmx_anchorRigidbody_t* anchorRigidbodies; // Pointer to anchor rigidbodies
+
+    int32_t pinVertexCount; // Number of pinned vertices
+    int32_t* pinVertexIndices; // Pointer to pinned vertex indices
+} pmx_softbody_t;
 typedef struct {
     pmx_header_t header; // PMX file header
     pmx_vertex_t vertex; // Vertex data
     pmx_face_t face; // Face data
+    pmx_texture_t texture; // Texture data
     pmx_material_t material; // Material data
     pmx_bone_t bone; // Bone data
     pmx_morph_t morph; // Morph data
+    pmx_displayFrame_t displayFrame; // Display frame data
+    pmx_rigidBody_t rigidBody; // Rigid body data
+    pmx_joint_t joint; // Joint data
+    pmx_softbody_t softbody; // Softbody data
 } pmx_t;
 
 pmx_t pmx;
