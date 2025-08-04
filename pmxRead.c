@@ -74,13 +74,13 @@ typedef enum {
 }pmx_weight_t;
 typedef struct
 {
-    vector2d_t position; // Vertex position (x, y, z)
+    vector3d_t position; // Vertex position (x, y, z)
     vector3d_t normal;   // Vertex normal (nx, ny, nz)
     vector2d_t uv;       // Texture coordinates (u, v)
     
     vector4d_t* addUV; // Additional data for vec4 if applicable
     
-    pmx_weight_t weightType;    // Weight type: 0=BDEF1, 1=BDEF2, 2=BDEF4, 3=SDEF, 4=QDEF
+    uint8_t weightType;    // Weight type: 0=BDEF1, 1=BDEF2, 2=BDEF4, 3=SDEF, 4=QDEF
     int32_t boneIndices[4]; // Bone indices for skinning
     float32_t boneWeights[4]; // Bone weights for skinning
     vector3d_t sdefC; // SDEF center
@@ -100,12 +100,13 @@ typedef struct {
 } pmx_face_data_t;
 
 typedef struct {
-    uint32_t count; // Number of faces
+    int32_t count; // Number of faces
     pmx_face_data_t* data; // Pointer to face data
 } pmx_face_t;
 
 typedef struct {
-    pmx_text_t path; // Texture file path
+    int32_t Number;
+    pmx_text_t* path; // Texture file path
 } pmx_texture_t;
 
 typedef enum {
@@ -514,7 +515,7 @@ void pmxReadIndex(int32_t* index, uint8_t Type, FILE* fd) {
     switch (Type) {
         case 1: {
             uint8_t idx;
-            Read(&idx, fd);
+            pmxRead(&idx, sizeof(idx), fd);
             if (idx != 0xFF) {
                 *index = (int32_t)idx;
             } else {
@@ -524,7 +525,7 @@ void pmxReadIndex(int32_t* index, uint8_t Type, FILE* fd) {
         break;
         case 2: {
             uint16_t idx;
-            Read(&idx, fd);
+            pmxRead(&idx, sizeof(idx), fd);
             if (idx != 0xFFFF) {
                 *index = (int32_t)idx;
             } else {
@@ -534,11 +535,16 @@ void pmxReadIndex(int32_t* index, uint8_t Type, FILE* fd) {
         break;
         case 4: {
             uint32_t idx;
-            Read(&idx, fd);
-            *index = (int32_t)idx;
+            pmxRead(&idx, sizeof(idx), fd);
+            if (idx != 0xFFFFFFFF) {
+                *index = (int32_t)idx;
+            } else {
+                *index = -1;
+            }
         } 
         break;
         default:
+        break;
     }
 }
 
@@ -606,6 +612,70 @@ void pmxReadVertex(pmx_t* pmx, FILE* fd) {
         pmxRead(&vertex->edgeMag, sizeof(vertex->edgeMag), fd);
     }
 }
+
+void pmxReadFace(pmx_t* pmx, FILE* fd) {
+    pmxRead(&(pmx->face.count), sizeof(pmx->face.count), fd);
+    pmx->face.count /= 3; // Each face has 3 vertices
+    
+    pmx->face.data = (pmx_face_data_t *)malloc(sizeof(pmx_face_data_t) * pmx->face.count);
+    switch (pmx->header.vertexIndexSize) {
+        case 1: {
+            //uint8_t indices[3 * pmx->face.count];
+            //pmxRead(&indices[0], sizeof(indices), fd);
+            uint8_t indices[1048575] = { 0 };
+            pmxRead(&indices[0], sizeof(uint8_t)* pmx->face.count * 3, fd);
+            for (uint32_t i = 0; i < pmx->face.count; i++) {
+                pmx_face_data_t* face = &(pmx->face.data[i]);
+                face->indices[0] = (uint32_t)indices[i * 3];
+                face->indices[1] = (uint32_t)indices[i * 3 + 1];
+                face->indices[2] = (uint32_t)indices[i * 3 + 2];
+            }
+        }
+        break;
+        case 2: {
+            //uint16_t indices[3 * pmx->face.count];
+            //pmxRead(&indices[0], sizeof(indices), fd);            
+            uint16_t indices[1048575] = { 0 };
+            pmxRead(&indices[0], sizeof(uint16_t) * pmx->face.count * 3, fd);
+            for (uint32_t i = 0; i < pmx->face.count; i++) {
+                pmx_face_data_t* face = &(pmx->face.data[i]);
+                face->indices[0] = (uint32_t)indices[i * 3];
+                face->indices[1] = (uint32_t)indices[i * 3 + 1];
+                face->indices[2] = (uint32_t)indices[i * 3 + 2];
+            }
+        }
+        break;
+        case 4: {
+            //uint32_t indices[3 * pmx->face.count];
+            //pmxRead(&indices[0], sizeof(indices), fd);
+            uint32_t indices[1048575] = { 0 };
+            pmxRead(&indices[0], sizeof(uint32_t) * pmx->face.count * 3, fd);
+            for (uint32_t i = 0; i < pmx->face.count; i++) {
+                pmx_face_data_t* face = &(pmx->face.data[i]);
+                face->indices[0] = indices[i * 3];
+                face->indices[1] = indices[i * 3 + 1];
+                face->indices[2] = indices[i * 3 + 2];
+            }
+        }
+        break;
+        default:
+            break;
+    }
+
+}
+
+void pmxReadTexture(pmx_t* pmx, FILE* fd) {
+    pmxRead(&(pmx->texture.Number), sizeof(pmx->texture.Number), fd);
+
+    pmx->texture.path = (pmx_text_t *)malloc(sizeof(pmx_text_t) * pmx->texture.Number);
+    for (uint32_t i = 0; i < pmx->texture.Number; i++) {
+        pmxReadString(&pmx->texture.path[i], fd);    
+        wprintf(L"texture%d:%ls\n", i, pmx->texture.path[i].data_wide);
+
+    }
+
+}
+
 pmx_t pmx;
 unsigned char buffer[65536];
 void read_file(char *filename)
@@ -621,7 +691,9 @@ void read_file(char *filename)
 
     pmxReadHeader(&pmx, fd);
     pmxReadVertex(&pmx, fd);
-
+    pmxReadFace(&pmx, fd);
+    pmxReadTexture(&pmx, fd);
+    // fread(&buffer[0],sizeof(buffer),1,fd);
     fclose(fd);
 }
 
