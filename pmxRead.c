@@ -74,7 +74,7 @@ typedef enum {
 }pmx_weight_t;
 typedef struct
 {
-    vector2d_t position[3]; // Vertex position (x, y, z)
+    vector2d_t position; // Vertex position (x, y, z)
     vector3d_t normal;   // Vertex normal (nx, ny, nz)
     vector2d_t uv;       // Texture coordinates (u, v)
     
@@ -91,7 +91,7 @@ typedef struct
 
 } pmx_vertex_data_t;
 typedef struct {
-    uint32_t count;
+    int32_t count;
     pmx_vertex_data_t* data; // Pointer to vertex data
 } pmx_vertex_t;
 
@@ -509,6 +509,103 @@ void pmxReadHeader(pmx_t* pmx, FILE* fd) {
     pmxReadString(&pmx->header.generalModelComment, fd);
 
 }
+
+void pmxReadIndex(int32_t* index, uint8_t Type, FILE* fd) {
+    switch (Type) {
+        case 1: {
+            uint8_t idx;
+            Read(&idx, fd);
+            if (idx != 0xFF) {
+                *index = (int32_t)idx;
+            } else {
+                *index = -1;
+            }
+        } 
+        break;
+        case 2: {
+            uint16_t idx;
+            Read(&idx, fd);
+            if (idx != 0xFFFF) {
+                *index = (int32_t)idx;
+            } else {
+                *index = -1;
+            }
+        } 
+        break;
+        case 4: {
+            uint32_t idx;
+            Read(&idx, fd);
+            *index = (int32_t)idx;
+        } 
+        break;
+        default:
+    }
+}
+
+void pmxReadVertex(pmx_t* pmx, FILE* fd) {
+    pmxRead(&(pmx->vertex.count), sizeof(pmx->vertex.count), fd);
+    pmx->vertex.data = (pmx_vertex_data_t *)malloc(sizeof(pmx_vertex_data_t) * (pmx->vertex.count));
+
+    for (uint32_t index = 0; index < pmx->vertex.count; index++) {
+        pmx_vertex_data_t* vertex = &(pmx->vertex.data[index]);
+
+        pmxRead(&(vertex->position), sizeof(vertex->position), fd);
+        pmxRead(&(vertex->normal), sizeof(vertex->normal), fd);
+        pmxRead(&(vertex->uv), sizeof(vertex->uv), fd);
+
+        if (0 != pmx->header.addUV4Num) {
+            vertex->addUV = (vector4d_t*)malloc(sizeof(vector4d_t) * (pmx->header.addUV4Num));
+            for (uint32_t i = 0; i < pmx->header.addUV4Num; i++) {
+              pmxRead(&(vertex->addUV[i]), sizeof(vertex->addUV[i]), fd);
+            }
+        }
+
+        pmxRead(&(vertex->weightType), sizeof(vertex->weightType), fd);
+
+        switch (vertex->weightType) {
+          case BDEF1:
+            pmxReadIndex(&vertex->boneIndices[0], pmx->header.boneIndexSize, fd);
+            break;
+          case BDEF2:            
+            pmxReadIndex(&vertex->boneIndices[0], pmx->header.boneIndexSize, fd);
+            pmxReadIndex(&vertex->boneIndices[1], pmx->header.boneIndexSize, fd);
+            pmxRead(&vertex->boneWeights[0], sizeof(vertex->boneWeights[0]), fd);
+            break;
+          case BDEF4:
+            pmxReadIndex(&vertex->boneIndices[0], pmx->header.boneIndexSize, fd);
+            pmxReadIndex(&vertex->boneIndices[1], pmx->header.boneIndexSize, fd);            
+            pmxReadIndex(&vertex->boneIndices[2], pmx->header.boneIndexSize, fd);
+            pmxReadIndex(&vertex->boneIndices[3], pmx->header.boneIndexSize, fd);
+            pmxRead(&vertex->boneWeights[0], sizeof(vertex->boneWeights[0]), fd);
+            pmxRead(&vertex->boneWeights[1], sizeof(vertex->boneWeights[1]), fd);
+            pmxRead(&vertex->boneWeights[2], sizeof(vertex->boneWeights[2]), fd);
+            pmxRead(&vertex->boneWeights[3], sizeof(vertex->boneWeights[3]), fd);
+            break;
+          case SDEF:
+            pmxReadIndex(&vertex->boneIndices[0], pmx->header.boneIndexSize, fd);
+            pmxReadIndex(&vertex->boneIndices[1], pmx->header.boneIndexSize, fd);            
+            pmxRead(&vertex->boneWeights[0], sizeof(vertex->boneWeights[0]), fd);
+            pmxRead(&vertex->sdefC, sizeof(vertex->sdefC), fd);
+            pmxRead(&vertex->sdefR0, sizeof(vertex->sdefR0), fd);
+            pmxRead(&vertex->sdefR1, sizeof(vertex->sdefR1), fd);
+            break;
+          case QDEF:            
+            pmxReadIndex(&vertex->boneIndices[0], pmx->header.boneIndexSize, fd);
+            pmxReadIndex(&vertex->boneIndices[1], pmx->header.boneIndexSize, fd);            
+            pmxReadIndex(&vertex->boneIndices[2], pmx->header.boneIndexSize, fd);
+            pmxReadIndex(&vertex->boneIndices[3], pmx->header.boneIndexSize, fd);
+            pmxRead(&vertex->boneWeights[0], sizeof(vertex->boneWeights[0]), fd);
+            pmxRead(&vertex->boneWeights[1], sizeof(vertex->boneWeights[1]), fd);
+            pmxRead(&vertex->boneWeights[2], sizeof(vertex->boneWeights[2]), fd);
+            pmxRead(&vertex->boneWeights[3], sizeof(vertex->boneWeights[3]), fd);
+            break;
+        default:
+            break;
+        }
+
+        pmxRead(&vertex->edgeMag, sizeof(vertex->edgeMag), fd);
+    }
+}
 pmx_t pmx;
 unsigned char buffer[65536];
 void read_file(char *filename)
@@ -523,16 +620,8 @@ void read_file(char *filename)
     }
 
     pmxReadHeader(&pmx, fd);
+    pmxReadVertex(&pmx, fd);
 
-    // fread(&(pmx.vertex.count), sizeof(pmx.vertex.count), 1, fd);
-    // pmx.vertex.size = 3 * 4 + 3 * 4 + 2 * 4; //32 position, normal, and UV coordinates
-    // if (pmx.goalType[1] !=0 ) {
-    //   pmx.vertex.size += 4 * 4 * pmx.goalType[1]; // Additional data for vec4
-    // }
-    // pmx.vertex.size += 1; // variable weight type 0=BDEF1，1=BDEF2，2=BDEF4，3=SDEF，4=QDEF
-
-    // fread(&buffer[0],sizeof(buffer),1,fd);
-    // printf("Read %d bytes from file.\n", buffer[33]);
     fclose(fd);
 }
 
