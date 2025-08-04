@@ -622,7 +622,7 @@ void pmxReadFace(pmx_t* pmx, FILE* fd) {
         case 1: {
             //uint8_t indices[3 * pmx->face.count];
             //pmxRead(&indices[0], sizeof(indices), fd);
-            uint8_t indices[1048575] = { 0 };
+            uint8_t indices[100000] = { 0 };
             pmxRead(&indices[0], sizeof(uint8_t)* pmx->face.count * 3, fd);
             for (uint32_t i = 0; i < pmx->face.count; i++) {
                 pmx_face_data_t* face = &(pmx->face.data[i]);
@@ -635,7 +635,7 @@ void pmxReadFace(pmx_t* pmx, FILE* fd) {
         case 2: {
             //uint16_t indices[3 * pmx->face.count];
             //pmxRead(&indices[0], sizeof(indices), fd);            
-            uint16_t indices[1048575] = { 0 };
+            uint16_t indices[100000] = { 0 };
             pmxRead(&indices[0], sizeof(uint16_t) * pmx->face.count * 3, fd);
             for (uint32_t i = 0; i < pmx->face.count; i++) {
                 pmx_face_data_t* face = &(pmx->face.data[i]);
@@ -648,7 +648,7 @@ void pmxReadFace(pmx_t* pmx, FILE* fd) {
         case 4: {
             //uint32_t indices[3 * pmx->face.count];
             //pmxRead(&indices[0], sizeof(indices), fd);
-            uint32_t indices[1048575] = { 0 };
+            uint32_t indices[100000] = { 0 };
             pmxRead(&indices[0], sizeof(uint32_t) * pmx->face.count * 3, fd);
             for (uint32_t i = 0; i < pmx->face.count; i++) {
                 pmx_face_data_t* face = &(pmx->face.data[i]);
@@ -693,7 +693,7 @@ void read_file(char *filename)
     pmxReadVertex(&pmx, fd);
     pmxReadFace(&pmx, fd);
     pmxReadTexture(&pmx, fd);
-    // fread(&buffer[0],sizeof(buffer),1,fd);
+    fread(&buffer[0],sizeof(buffer),1,fd);
     fclose(fd);
 }
 
