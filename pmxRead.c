@@ -5,6 +5,7 @@
 #include <locale.h>
 #include "vector/vector.h"
 
+unsigned char buffer[65536];
 typedef  unsigned char uint8_t;
 typedef  unsigned short uint16_t;
 typedef  unsigned int uint32_t;
@@ -219,7 +220,7 @@ typedef struct {
     int32_t ikTargetBoneIndex; // IK target bone index
     int32_t ikIterationCount; // IK iteration count
     float32_t ikLimitAngle; // IK limit angle
-    uint8_t ikLinkCount; // Number of IK links
+    int32_t ikLinkCount; // Number of IK links
     pmx_lk_link_t* ikLinks; // Pointer to IK links
 
 } pmx_bone_data_t;
@@ -682,7 +683,7 @@ void pmxReadTexture(pmx_t* pmx, FILE* fd) {
     pmx->texture.path = (pmx_text_t *)malloc(sizeof(pmx_text_t) * pmx->texture.Number);
     for (uint32_t i = 0; i < pmx->texture.Number; i++) {
         pmxReadString(&pmx->texture.path[i], fd);    
-        wprintf(L"texture%d:%ls\n", i, pmx->texture.path[i].data_wide);
+        //wprintf(L"texture%d:%ls\n", i, pmx->texture.path[i].data_wide);
 
     }
 
@@ -714,7 +715,7 @@ void pmxReadMaterial(pmx_t* pmx, FILE* fd) {
 
       pmxRead(&material->toonMode, sizeof(material->toonMode), fd);
       if (external == material->toonMode) {
-        pmxRead(&material->toonTextureIndex, sizeof(material->toonTextureIndex), fd);
+        pmxReadIndex(&material->toonTextureIndex, pmx->header.textureIndexSize, fd);
       } else if (internal == material->toonMode) {
         uint8_t toonTextureIndex;
         pmxRead(&toonTextureIndex, sizeof(toonTextureIndex), fd);
@@ -722,6 +723,7 @@ void pmxReadMaterial(pmx_t* pmx, FILE* fd) {
       }
 
       pmxReadString(&material->memo, fd);
+
       pmxRead(&material->numFace, sizeof(material->numFace), fd);
     }
 }
@@ -743,45 +745,55 @@ void pmxReadBone(pmx_t* pmx, FILE* fd) {
       pmxRead(&bone->deformDepth, sizeof(bone->deformDepth), fd);
 
       pmxRead(&bone->boneflag, sizeof(bone->boneflag), fd);
-
-      if (0 == (bone->boneflag & TargetShowMode)){
+        
+      if (false == (bone->boneflag & TargetShowMode)){
         pmxRead(&bone->tailPosition, sizeof(bone->tailPosition), fd);
       } else {
-        pmxReadIndex(&bone->tailBoneIndex, sizeof(bone->tailBoneIndex), fd);
+        pmxReadIndex(&bone->tailBoneIndex, pmx->header.boneIndexSize, fd);
       }
 
-      if ((true == (bone->boneflag & AppendRotate)) || 
-          (true == (bone->boneflag & AppendTranslate))) {
+      if ((bone->boneflag & AppendRotate) || 
+          (bone->boneflag & AppendTranslate)) {
         pmxReadIndex(&bone->inheritBoneIndex, pmx->header.boneIndexSize, fd);
         pmxRead(&bone->inheritWeight, sizeof(bone->inheritWeight), fd);
       }
 
-      if (true == (bone->boneflag & FixedAxis)) {
+      if (bone->boneflag & FixedAxis) {
         pmxRead(&bone->fixedAxis, sizeof(bone->fixedAxis), fd);
       }
 
-      if (true == (bone->boneflag & LocalAxis)) {
+      if (bone->boneflag & LocalAxis) {
         pmxRead(&bone->localAxisX, sizeof(bone->localAxisX), fd);
         pmxRead(&bone->localAxisY, sizeof(bone->localAxisY), fd);
       }
 
-      if (true == (bone->boneflag & DeformOuterParent)) {
+      if (bone->boneflag & DeformOuterParent) {
         pmxRead(&bone->externalParentKey, sizeof(bone->externalParentKey), fd);
       }
 
-      if (true == (bone->boneflag & IK)) {
+      if (bone->boneflag & IK) {
         pmxReadIndex(&bone->ikTargetBoneIndex, pmx->header.boneIndexSize, fd);
         pmxRead(&bone->ikIterationCount, sizeof(bone->ikIterationCount), fd);
         pmxRead(&bone->ikLimitAngle, sizeof(bone->ikLimitAngle), fd);
 
         pmxRead(&bone->ikLinkCount, sizeof(bone->ikLinkCount), fd);
 
-        
+        bone->ikLinks = (pmx_lk_link_t*)malloc(sizeof(pmx_lk_link_t) * bone->ikLinkCount);
+        for (uint32_t i = 0; i < bone->ikLinkCount; i++) {
+            pmx_lk_link_t* link = &bone->ikLinks[i];
+            pmxReadIndex(&link->boneIndex, pmx->header.boneIndexSize, fd);
+            pmxRead(&link->angleLimit, sizeof(link->angleLimit), fd);
+
+            if (0 != link->angleLimit) {
+                pmxRead(&link->minLimit, sizeof(link->minLimit), fd);
+                pmxRead(&link->maxLimit, sizeof(link->maxLimit), fd);
+            }
+        }
       }
     }
 }
+
 pmx_t pmx;
-unsigned char buffer[65536];
 void read_file(char *filename)
 {
     setlocale(LC_ALL, "");// suggested print to windows terminal
@@ -798,6 +810,7 @@ void read_file(char *filename)
     pmxReadFace(&pmx, fd);
     pmxReadTexture(&pmx, fd);
     pmxReadMaterial(&pmx, fd);
+    pmxReadBone(&pmx, fd);
     fread(&buffer[0],sizeof(buffer),1,fd);
     fclose(fd);
 }
