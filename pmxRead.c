@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
 #include <locale.h>
 #include "vector/vector.h"
@@ -141,21 +142,26 @@ typedef struct {
     float32_t specularPower; // Specular power
     vector3d_t ambient; // Ambient color (RGB)
 
-    pmx_draw_mode_flags_t drawMode; // Draw mode flags
+    uint8_t drawMode; // Draw mode flags
 
     vector4d_t edgeColor; // Edge color (RGBA)
     float32_t edgeRatio; // Edge ratio
 
-    uint32_t textureIndex; // Texture index
-    uint32_t specularTextureIndex; // Sphere texture index
-    pmx_blend_mode_t blendMode; // Toon texture factor
+    int32_t textureIndex; // Texture index
+    int32_t specularTextureIndex; // Sphere texture index
+    uint8_t blendMode;             // Toon texture factor
 
-    pmx_toon_mode_t toonMode; // Texture reference type
+    uint8_t toonMode;         // Texture reference type
     int32_t toonTextureIndex; // Toon texture index
 
     pmx_text_t memo; // Material memo
 
-    uint32_t numFace; // Number of face vertices
+    int32_t numFace; // Number of face vertices
+} pmx_material_data_t;
+
+typedef struct {
+    int32_t count;
+    pmx_material_data_t* data;
 } pmx_material_t;
 
 typedef enum {
@@ -181,6 +187,7 @@ typedef struct {
     vector3d_t minLimit; // Minimum angle limit (x, y, z)
     vector3d_t maxLimit; // Maximum angle limit (x, y, z)
 }pmx_lk_link_t;
+
 typedef struct {
     pmx_text_t localBoonName; // Bone name
     pmx_text_t generalBoonName; // English bone name
@@ -188,7 +195,7 @@ typedef struct {
     vector3d_t position; // Bone position (x, y, z)
     int32_t    parentBoneIndex; // Parent bone index
     int32_t    deformDepth;
-    pmx_bone_flags_t flags[2]; // Bone flags
+    uint16_t   boneflag;  // Bone flags
 
     /* tail position */
     vector3d_t tailPosition; // Tail position (x, y, z)
@@ -215,6 +222,11 @@ typedef struct {
     uint8_t ikLinkCount; // Number of IK links
     pmx_lk_link_t* ikLinks; // Pointer to IK links
 
+} pmx_bone_data_t;
+
+typedef struct {
+    int32_t count;
+    pmx_bone_data_t* data;
 } pmx_bone_t;
 
 typedef	enum {
@@ -676,6 +688,98 @@ void pmxReadTexture(pmx_t* pmx, FILE* fd) {
 
 }
 
+void pmxReadMaterial(pmx_t* pmx, FILE* fd) {
+    pmxRead(&(pmx->material.count), sizeof(pmx->material.count), fd);
+
+    pmx->material.data = (pmx_material_data_t *)malloc(sizeof(pmx_material_data_t) * pmx->material.count);
+    for (uint32_t index = 0; index < pmx->material.count; index++) {
+      pmx_material_data_t* material = &pmx->material.data[index];
+      pmxReadString(&material->localMaterialName, fd);
+      pmxReadString(&material->generalMaterialName, fd);
+
+      pmxRead(&material->diffuse, sizeof(material->diffuse), fd);
+      pmxRead(&material->specular, sizeof(material->specular), fd);
+      pmxRead(&material->specularPower, sizeof(material->specularPower), fd);
+
+      pmxRead(&material->ambient, sizeof(material->ambient), fd);
+
+      pmxRead(&material->drawMode, sizeof(material->drawMode), fd);
+
+      pmxRead(&material->edgeColor, sizeof(material->edgeColor), fd);
+      pmxRead(&material->edgeRatio, sizeof(material->edgeRatio), fd);
+
+      pmxReadIndex(&material->textureIndex, pmx->header.textureIndexSize, fd);
+      pmxReadIndex(&material->specularTextureIndex, pmx->header.textureIndexSize, fd);
+      pmxRead(&material->blendMode, sizeof(material->blendMode), fd);
+
+      pmxRead(&material->toonMode, sizeof(material->toonMode), fd);
+      if (external == material->toonMode) {
+        pmxRead(&material->toonTextureIndex, sizeof(material->toonTextureIndex), fd);
+      } else if (internal == material->toonMode) {
+        uint8_t toonTextureIndex;
+        pmxRead(&toonTextureIndex, sizeof(toonTextureIndex), fd);
+        material->textureIndex = (int32_t)toonTextureIndex;
+      }
+
+      pmxReadString(&material->memo, fd);
+      pmxRead(&material->numFace, sizeof(material->numFace), fd);
+    }
+}
+
+void pmxReadBone(pmx_t* pmx, FILE* fd) {
+  pmxRead(&(pmx->bone.count), sizeof(pmx->bone.count), fd);
+
+  pmx->bone.data = (pmx_bone_data_t*)malloc(sizeof(pmx_bone_data_t) * pmx->bone.count);
+  for (uint32_t index = 0; index < pmx->bone.count; index++) {
+      pmx_bone_data_t* bone = &pmx->bone.data[index];
+      
+      pmxReadString(&bone->localBoonName, fd);
+      pmxReadString(&bone->generalBoonName, fd);
+
+      pmxRead(&bone->position, sizeof(bone->position), fd);
+
+      pmxReadIndex(&bone->parentBoneIndex, pmx->header.boneIndexSize, fd);
+
+      pmxRead(&bone->deformDepth, sizeof(bone->deformDepth), fd);
+
+      pmxRead(&bone->boneflag, sizeof(bone->boneflag), fd);
+
+      if (0 == (bone->boneflag & TargetShowMode)){
+        pmxRead(&bone->tailPosition, sizeof(bone->tailPosition), fd);
+      } else {
+        pmxReadIndex(&bone->tailBoneIndex, sizeof(bone->tailBoneIndex), fd);
+      }
+
+      if ((true == (bone->boneflag & AppendRotate)) || 
+          (true == (bone->boneflag & AppendTranslate))) {
+        pmxReadIndex(&bone->inheritBoneIndex, pmx->header.boneIndexSize, fd);
+        pmxRead(&bone->inheritWeight, sizeof(bone->inheritWeight), fd);
+      }
+
+      if (true == (bone->boneflag & FixedAxis)) {
+        pmxRead(&bone->fixedAxis, sizeof(bone->fixedAxis), fd);
+      }
+
+      if (true == (bone->boneflag & LocalAxis)) {
+        pmxRead(&bone->localAxisX, sizeof(bone->localAxisX), fd);
+        pmxRead(&bone->localAxisY, sizeof(bone->localAxisY), fd);
+      }
+
+      if (true == (bone->boneflag & DeformOuterParent)) {
+        pmxRead(&bone->externalParentKey, sizeof(bone->externalParentKey), fd);
+      }
+
+      if (true == (bone->boneflag & IK)) {
+        pmxReadIndex(&bone->ikTargetBoneIndex, pmx->header.boneIndexSize, fd);
+        pmxRead(&bone->ikIterationCount, sizeof(bone->ikIterationCount), fd);
+        pmxRead(&bone->ikLimitAngle, sizeof(bone->ikLimitAngle), fd);
+
+        pmxRead(&bone->ikLinkCount, sizeof(bone->ikLinkCount), fd);
+
+        
+      }
+    }
+}
 pmx_t pmx;
 unsigned char buffer[65536];
 void read_file(char *filename)
@@ -693,6 +797,7 @@ void read_file(char *filename)
     pmxReadVertex(&pmx, fd);
     pmxReadFace(&pmx, fd);
     pmxReadTexture(&pmx, fd);
+    pmxReadMaterial(&pmx, fd);
     fread(&buffer[0],sizeof(buffer),1,fd);
     fclose(fd);
 }
