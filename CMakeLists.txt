@@ -13,6 +13,8 @@ set(HEADER_FILES
     graphics/graphics.h
     win32/win32.h
     dyarray/dyarray.h
+    pmx/pmx.h
+    type/type.h
     
 )
 
@@ -21,9 +23,9 @@ set(SOURCE_FILES
    framebuffer/framebuffer.c
    graphics/graphics.c
    win32/win32.c
+   pmx/pmx.c
 )
 
-# set(SRC_CUR main.c)
-set(SRC_CUR pmxRead.c)
+set(SRC_CUR main.c)
 add_executable(Renderer ${HEADER_FILES} ${SRC_CUR}  
                           ${SOURCE_FILES})
