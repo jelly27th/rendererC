@@ -252,7 +252,7 @@ typedef struct  {
 typedef struct {
     int32_t		vertexIndex;
     vector3d_t	position;
-}pmx_vertex_morph_t;
+} pmx_vertex_morph_t;
 
 typedef struct  {
     int32_t		boneIndex;
@@ -272,7 +272,7 @@ typedef enum {
 typedef struct  {
 
     int32_t		materialIndex;
-    pmx_op_type_t	opType;	
+    uint8_t		opType;	
     vector4d_t	diffuse;
     vector3d_t	specular;
     float		specularPower;
@@ -299,8 +299,9 @@ typedef struct {
     pmx_text_t generalMorphName; // English morph name
 
     uint8_t controlPanel; // Control panel index
-    pmx_morph_type_t morphType; // Morph type
+    uint8_t morphType; // Morph type
 
+    int32_t morphCount; // Number of morphs
     pmx_vertex_morph_t* positionMorphs; // Position morphs
     pmx_uv_morph_t* uvMorphs; // UV morphs
     pmx_bone_morph_t* boneMorphs; // Bone morphs
@@ -309,6 +310,11 @@ typedef struct {
     pmx_flip_morph_t* flipMorphs; // Flip morphs
     pmx_impulse_morph_t* impulseMorphs; // Impulse morphs
 
+} pmx_morph_data_t;
+
+typedef struct {
+    int32_t count; // Number of morphs
+    pmx_morph_data_t* data; // Pointer to morph data
 } pmx_morph_t;
 
 typedef enum {
@@ -322,7 +328,7 @@ typedef enum{
 } pmx_target_type_t;
 
 typedef struct {
-    pmx_target_type_t targetType; // Target type: BoneIndex or MorphIndex
+    uint8_t targetType; // Target type: BoneIndex or MorphIndex
     int32_t targetIndex; // Index of the target (bone or morph)
 } pmx_frame_target_t;
 
@@ -331,11 +337,16 @@ typedef struct {
     pmx_text_t localFrameName; // Frame name
     pmx_text_t generalFrameName; // English frame name
 
-    pmx_frame_type_t frameType; // Frame type
+    uint8_t frameType; // Frame type
 
     int32_t frameCount; // Number of targets in the frame
     pmx_frame_target_t* targets; // Pointer to target data
 
+} pmx_displayFrame_data_t;
+
+typedef struct {
+    int32_t count; // Number of display frames
+    pmx_displayFrame_data_t* data; // Pointer to display frame data
 } pmx_displayFrame_t;
 
 typedef enum {
@@ -793,6 +804,116 @@ void pmxReadBone(pmx_t* pmx, FILE* fd) {
     }
 }
 
+void pmxReadMorph(pmx_t* pmx, FILE* fd) {
+    pmxRead(&(pmx->morph.count), sizeof(pmx->morph.count), fd);
+
+    pmx->morph.data = (pmx_morph_data_t*)malloc(sizeof(pmx_morph_data_t) * pmx->morph.count);
+    for (uint32_t index = 0; index < pmx->morph.count; index++) {
+        pmx_morph_data_t* morph = &pmx->morph.data[index];
+
+        pmxReadString(&morph->localMorphName, fd);
+        pmxReadString(&morph->generalMorphName, fd);
+
+        pmxRead(&morph->controlPanel, sizeof(morph->controlPanel), fd);
+        pmxRead(&morph->morphType, sizeof(morph->morphType), fd);
+
+        pmxRead(&morph->morphCount, sizeof(morph->morphCount), fd);
+        if (Group == morph->morphType) {
+            morph->groupMorphs = (pmx_group_morph_t*)malloc(sizeof(pmx_group_morph_t) * morph->morphCount);
+            for (uint32_t i = 0; i < morph->morphCount; i++) {
+                pmx_group_morph_t* groupMorph = &morph->groupMorphs[i];
+                pmxReadIndex(&groupMorph->morphIndex, pmx->header.morphIndexSize, fd);
+                pmxRead(&groupMorph->weight, sizeof(groupMorph->weight), fd);
+            }
+        } else if (Position == morph->morphType) {
+            morph->positionMorphs = (pmx_vertex_morph_t*)malloc(sizeof(pmx_vertex_morph_t) * morph->morphCount);
+            for (uint32_t i = 0; i < morph->morphCount; i++) {
+                pmx_vertex_morph_t* vertexMorph = &morph->positionMorphs[i];
+                pmxReadIndex(&vertexMorph->vertexIndex, pmx->header.vertexIndexSize, fd);
+                pmxRead(&vertexMorph->position, sizeof(vertexMorph->position), fd);
+            }
+        } else if (Bone == morph->morphType) {
+            morph->boneMorphs = (pmx_bone_morph_t*)malloc(sizeof(pmx_bone_morph_t) * morph->morphCount);
+            for (uint32_t i = 0; i < morph->morphCount; i++) {
+                pmx_bone_morph_t* boneMorph = &morph->boneMorphs[i];
+                pmxReadIndex(&boneMorph->boneIndex, pmx->header.boneIndexSize, fd);
+                pmxRead(&boneMorph->position, sizeof(boneMorph->position), fd);
+                pmxRead(&boneMorph->quaternion, sizeof(boneMorph->quaternion), fd);
+            }
+        } else if (UV == morph->morphType || 
+                   AddUV1 == morph->morphType || 
+                   AddUV2 == morph->morphType || 
+                   AddUV3 == morph->morphType || 
+                   AddUV4 == morph->morphType) {
+            morph->uvMorphs = (pmx_uv_morph_t*)malloc(sizeof(pmx_uv_morph_t) * morph->morphCount);
+            for (uint32_t i = 0; i < morph->morphCount; i++) {
+                pmx_uv_morph_t* uvMorph = &morph->uvMorphs[i];
+                pmxReadIndex(&uvMorph->vertexIndex, pmx->header.vertexIndexSize, fd);
+                pmxRead(&uvMorph->uv, sizeof(uvMorph->uv), fd);
+            }
+        } else if (Material == morph->morphType) {
+            morph->materialMorphs = (pmx_material_morph_t*)malloc(sizeof(pmx_material_morph_t) * morph->morphCount);
+            for (uint32_t i = 0; i < morph->morphCount; i++) {
+                pmx_material_morph_t* materialMorph = &morph->materialMorphs[i];
+                pmxReadIndex(&materialMorph->materialIndex, pmx->header.materialIndexSize, fd);
+                pmxRead(&materialMorph->opType, sizeof(materialMorph->opType), fd);
+                pmxRead(&materialMorph->diffuse, sizeof(materialMorph->diffuse), fd);
+                pmxRead(&materialMorph->specular, sizeof(materialMorph->specular), fd);
+                pmxRead(&materialMorph->specularPower, sizeof(materialMorph->specularPower), fd);
+                pmxRead(&materialMorph->ambient, sizeof(materialMorph->ambient), fd);
+                pmxRead(&materialMorph->edgeColor, sizeof(materialMorph->edgeColor), fd);
+                pmxRead(&materialMorph->edgeSize, sizeof(materialMorph->edgeSize), fd);
+                pmxRead(&materialMorph->textureFactor, sizeof(materialMorph->textureFactor), fd);
+                pmxRead(&materialMorph->sphereTextureFactor, sizeof(materialMorph->sphereTextureFactor), fd);
+                pmxRead(&materialMorph->toonTextureFactor, sizeof(materialMorph->toonTextureFactor), fd);
+            }
+
+        } else if (Flip == morph->morphType) {
+            morph->flipMorphs = (pmx_flip_morph_t*)malloc(sizeof(pmx_flip_morph_t) * morph->morphCount);
+            for (uint32_t i = 0; i < morph->morphCount; i++) {
+                pmx_flip_morph_t* flipMorph = &morph->flipMorphs[i];
+                pmxReadIndex(&flipMorph->morphIndex, pmx->header.morphIndexSize, fd);
+                pmxRead(&flipMorph->m_weight, sizeof(flipMorph->m_weight), fd);
+            }
+        } else if (Impluse == morph->morphType) {
+            morph->impulseMorphs = (pmx_impulse_morph_t*)malloc(sizeof(pmx_impulse_morph_t) * morph->morphCount);
+            for (uint32_t i = 0; i < morph->morphCount; i++) {
+                pmx_impulse_morph_t* impulseMorph = &morph->impulseMorphs[i];
+                pmxReadIndex(&impulseMorph->rigidbodyIndex, pmx->header.rigidbodyIndexSize, fd);
+                pmxRead(&impulseMorph->localFlag, sizeof(impulseMorph->localFlag), fd);
+                pmxRead(&impulseMorph->translateVelocity, sizeof(impulseMorph->translateVelocity), fd);
+                pmxRead(&impulseMorph->rotateTorque, sizeof(impulseMorph->rotateTorque), fd);
+            }
+        }
+    }
+}
+
+void pmxReadDisplayFrame(pmx_t* pmx, FILE* fd) {
+    pmxRead(&(pmx->displayFrame.count), sizeof(pmx->displayFrame.count), fd);
+
+    pmx->displayFrame.data = (pmx_displayFrame_data_t*)malloc(sizeof(pmx_displayFrame_data_t) * pmx->displayFrame.count);
+    for (uint32_t index = 0; index < pmx->displayFrame.count; index++) {
+        pmx_displayFrame_data_t* frame = &pmx->displayFrame.data[index];
+
+        pmxReadString(&frame->localFrameName, fd);
+        pmxReadString(&frame->generalFrameName, fd);
+
+        pmxRead(&frame->frameType, sizeof(frame->frameType), fd);
+
+        pmxRead(&frame->frameCount, sizeof(frame->frameCount), fd);
+        frame->targets = (pmx_frame_target_t*)malloc(sizeof(pmx_frame_target_t) * frame->frameCount);
+        for (uint32_t i = 0; i < frame->frameCount; i++) {
+            pmx_frame_target_t* target = &frame->targets[i];
+            pmxRead(&target->targetType, sizeof(target->targetType), fd);
+            if (BoneIndex == target->targetType) {
+                pmxReadIndex(&target->targetIndex, pmx->header.boneIndexSize, fd);
+            } else if (MorphIndex == target->targetType) {
+                pmxReadIndex(&target->targetIndex, pmx->header.morphIndexSize, fd);
+            }
+        }
+    }
+}
+
 pmx_t pmx;
 void read_file(char *filename)
 {
@@ -811,6 +932,9 @@ void read_file(char *filename)
     pmxReadTexture(&pmx, fd);
     pmxReadMaterial(&pmx, fd);
     pmxReadBone(&pmx, fd);
+
+    pmxReadMorph(&pmx, fd);
+    pmxReadDisplayFrame(&pmx, fd);
     fread(&buffer[0],sizeof(buffer),1,fd);
     fclose(fd);
 }
