@@ -368,7 +368,7 @@ typedef struct {
     uint8_t groupID; // Group index
     uint16_t collisionGroup; // Collision group index
 
-    pmx_rigidShape_t shape; // Shape type: Sphere, Box, Capsule
+    uint8_t shape; // Shape type: Sphere, Box, Capsule
     vector3d_t shapeSize; // Shape size (x, y, z)
     vector3d_t translate; // Position (x, y, z)
     vector3d_t rotate; // Rotation (x, y, z in radians)
@@ -378,8 +378,13 @@ typedef struct {
     float32_t rotateDimmer; // Damping factor for rotation
     float32_t repulsion; // Repulsion factor
     float32_t friction; // Friction factor
-    pmx_rigidOperation_t operation; // Operation type: Static, Dynamic, DynamicAndBoneMerge
+    uint8_t operation; // Operation type: Static, Dynamic, DynamicAndBoneMerge
 
+} pmx_rigidBody_data_t;
+
+typedef struct {
+    int32_t count; // Number of rigid bodies
+    pmx_rigidBody_data_t* data; // Pointer to rigid body data
 } pmx_rigidBody_t;
 
 typedef enum {
@@ -394,7 +399,7 @@ typedef struct {
     pmx_text_t localJointName; // Joint name
     pmx_text_t generalJointName; // English joint name
 
-    pmx_jointType_t type; // Joint type
+    uint8_t type; // Joint type
     int32_t rigidBodyAIndex; // Index of the first rigid body
     int32_t rigidBodyBIndex; // Index of the second rigid body
 
@@ -409,8 +414,12 @@ typedef struct {
     vector3d_t springTranslateFactor; // Spring factor for translation (x, y, z)
     vector3d_t springRotateFactor; // Spring factor for rotation (x, y, z)
 
-} pmx_joint_t;
+} pmx_joint_data_t;
 
+typedef struct {
+    int32_t count; // Number of joints
+    pmx_joint_data_t* data; // Pointer to joint data
+} pmx_joint_t;
 typedef enum {
     TriMesh,
     Rope,
@@ -431,13 +440,13 @@ typedef struct {
     pmx_text_t localSoftbodyName; // Softbody name
     pmx_text_t generalSoftbodyName; // English softbody name
 
-    pmx_softbodyType_t type; // Softbody type: TriMesh or Rope
+    uint8_t type; // Softbody type: TriMesh or Rope
     int32_t materialIndex; // Material index
     
     uint8_t group; // Group index
     uint16_t collisionGroup; // Collision group index
 
-    pmx_softbodyMask_t flag; // Softbody mask flags
+    uint8_t flag; // Softbody mask flags
 
     int32_t bLinkLength; // B-Link length
     int32_t numClusters; // Number of clusters
@@ -463,6 +472,7 @@ typedef struct {
     float32_t MT; // Material factor
     float32_t CHR; // Cluster hardness
     float32_t KHR; // Kinematic hardness
+    float32_t SHR; // Softbody hardness
     float32_t AHR; // Aero hardness
 
     float32_t SRHR_CL; // Softbody rigid hardness
@@ -486,6 +496,11 @@ typedef struct {
 
     int32_t pinVertexCount; // Number of pinned vertices
     int32_t* pinVertexIndices; // Pointer to pinned vertex indices
+} pmx_softbody_data_t;
+
+typedef struct {
+    int32_t count; // Number of softbodies
+    pmx_softbody_data_t* data; // Pointer to softbody data
 } pmx_softbody_t;
 typedef struct {
     pmx_header_t header; // PMX file header
@@ -914,6 +929,135 @@ void pmxReadDisplayFrame(pmx_t* pmx, FILE* fd) {
     }
 }
 
+void pmxReadRibody(pmx_t* pmx, FILE* fd) {
+    pmxRead(&(pmx->rigidBody.count), sizeof(pmx->rigidBody.count), fd);
+
+    pmx->rigidBody.data = (pmx_rigidBody_data_t*)malloc(sizeof(pmx_rigidBody_data_t) * pmx->rigidBody.count);
+    for (uint32_t index = 0; index < pmx->rigidBody.count; index++) {
+        pmx_rigidBody_data_t* rigidBody = &pmx->rigidBody.data[index];
+
+        pmxReadString(&rigidBody->localName, fd);
+        pmxReadString(&rigidBody->generalName, fd);
+
+        pmxReadIndex(&rigidBody->boneIndex, pmx->header.boneIndexSize, fd);
+        pmxRead(&rigidBody->groupID, sizeof(rigidBody->groupID), fd);
+        pmxRead(&rigidBody->collisionGroup, sizeof(rigidBody->collisionGroup), fd);
+
+        pmxRead(&rigidBody->shape, sizeof(rigidBody->shape), fd);
+        pmxRead(&rigidBody->shapeSize, sizeof(rigidBody->shapeSize), fd);
+        
+        pmxRead(&rigidBody->translate, sizeof(rigidBody->translate), fd);
+        pmxRead(&rigidBody->rotate, sizeof(rigidBody->rotate), fd);
+
+        pmxRead(&rigidBody->mass, sizeof(rigidBody->mass), fd);
+        pmxRead(&rigidBody->translateDimmer, sizeof(rigidBody->translateDimmer), fd);
+        pmxRead(&rigidBody->rotateDimmer, sizeof(rigidBody->rotateDimmer), fd);
+        pmxRead(&rigidBody->repulsion, sizeof(rigidBody->repulsion), fd);
+        pmxRead(&rigidBody->friction, sizeof(rigidBody->friction), fd);
+        
+        pmxRead(&rigidBody->operation, sizeof(rigidBody->operation), fd);
+    }
+}
+
+void pmxReadJoint(pmx_t* pmx, FILE* fd) {
+    pmxRead(&(pmx->joint.count), sizeof(pmx->joint.count), fd);
+
+    pmx->joint.data = (pmx_joint_data_t*)malloc(sizeof(pmx_joint_data_t) * pmx->joint.count);
+    for (uint32_t index = 0; index < pmx->joint.count; index++) {
+        pmx_joint_data_t* joint = &pmx->joint.data[index];
+
+        pmxReadString(&joint->localJointName, fd);
+        pmxReadString(&joint->generalJointName, fd);
+
+        pmxRead(&joint->type, sizeof(joint->type), fd);
+        pmxReadIndex(&joint->rigidBodyAIndex, pmx->header.rigidbodyIndexSize, fd);
+        pmxReadIndex(&joint->rigidBodyBIndex, pmx->header.rigidbodyIndexSize, fd);
+
+        pmxRead(&joint->translate, sizeof(joint->translate), fd);
+        pmxRead(&joint->rotate, sizeof(joint->rotate), fd);
+
+        pmxRead(&joint->translateLowerLimit, sizeof(joint->translateLowerLimit), fd);
+        pmxRead(&joint->translateUpperLimit, sizeof(joint->translateUpperLimit), fd);
+        pmxRead(&joint->rotateLowerLimit, sizeof(joint->rotateLowerLimit), fd);
+        pmxRead(&joint->rotateUpperLimit, sizeof(joint->rotateUpperLimit), fd);
+
+        pmxRead(&joint->springTranslateFactor, sizeof(joint->springTranslateFactor), fd);
+        pmxRead(&joint->springRotateFactor, sizeof(joint->springRotateFactor), fd);
+    }
+}
+
+void pmxReadSoftBody(pmx_t* pmx, FILE* fd) {
+    pmxRead(&(pmx->softbody.count), sizeof(pmx->softbody.count), fd);
+
+    pmx->softbody.data = (pmx_softbody_data_t*)malloc(sizeof(pmx_softbody_data_t) * pmx->softbody.count);
+    for (uint32_t index = 0; index < pmx->softbody.count; index++) {
+        pmx_softbody_data_t* softbody = &pmx->softbody.data[index];
+
+        pmxReadString(&softbody->localSoftbodyName, fd);
+        pmxReadString(&softbody->generalSoftbodyName, fd);
+
+        pmxRead(&softbody->type, sizeof(softbody->type), fd);
+        pmxReadIndex(&softbody->materialIndex, pmx->header.materialIndexSize, fd);
+
+        pmxRead(&softbody->group, sizeof(softbody->group), fd);
+        pmxRead(&softbody->collisionGroup, sizeof(softbody->collisionGroup), fd);
+
+        pmxRead(&softbody->flag, sizeof(softbody->flag), fd);
+
+        pmxRead(&softbody->bLinkLength, sizeof(softbody->bLinkLength), fd);
+        pmxRead(&softbody->numClusters, sizeof(softbody->numClusters), fd);
+
+        pmxRead(&softbody->totalMass, sizeof(softbody->totalMass), fd);
+        pmxRead(&softbody->collisionMargin, sizeof(softbody->collisionMargin), fd);
+
+        pmxRead(&softbody->AeroModel, sizeof(softbody->AeroModel), fd);
+
+        pmxRead(&softbody->VCF, sizeof(softbody->VCF), fd);
+        pmxRead(&softbody->DP, sizeof(softbody->DP), fd);
+        pmxRead(&softbody->DG, sizeof(softbody->DG), fd);
+        pmxRead(&softbody->LF, sizeof(softbody->LF), fd);
+        pmxRead(&softbody->PR, sizeof(softbody->PR), fd);
+        pmxRead(&softbody->VC, sizeof(softbody->VC), fd);
+        pmxRead(&softbody->DF, sizeof(softbody->DF), fd);
+        pmxRead(&softbody->MT, sizeof(softbody->MT), fd);
+        pmxRead(&softbody->CHR, sizeof(softbody->CHR), fd);
+        pmxRead(&softbody->KHR, sizeof(softbody->KHR), fd);
+        pmxRead(&softbody->SHR, sizeof(softbody->SHR), fd);
+        pmxRead(&softbody->AHR, sizeof(softbody->AHR), fd);
+
+        pmxRead(&softbody->SRHR_CL, sizeof(softbody->SRHR_CL), fd);
+        pmxRead(&softbody->SKHR_CL, sizeof(softbody->SKHR_CL), fd);
+        pmxRead(&softbody->SSHR_CL, sizeof(softbody->SSHR_CL), fd);
+        pmxRead(&softbody->SR_SPLT_CL, sizeof(softbody->SR_SPLT_CL), fd);
+        pmxRead(&softbody->SK_SPLT_CL, sizeof(softbody->SK_SPLT_CL), fd);
+        pmxRead(&softbody->SS_SPLT_CL, sizeof(softbody->SS_SPLT_CL), fd);
+
+        pmxRead(&softbody->V_IT, sizeof(softbody->V_IT), fd);
+        pmxRead(&softbody->P_IT, sizeof(softbody->P_IT), fd);
+        pmxRead(&softbody->D_IT, sizeof(softbody->D_IT), fd);
+        pmxRead(&softbody->C_IT, sizeof(softbody->C_IT), fd);
+
+        pmxRead(&softbody->LST, sizeof(softbody->LST), fd);
+        pmxRead(&softbody->AST, sizeof(softbody->AST), fd);
+        pmxRead(&softbody->VST, sizeof(softbody->VST), fd);
+
+        pmxRead(&softbody->AnchorRigidbodyCount, sizeof(softbody->AnchorRigidbodyCount), fd);
+        softbody->anchorRigidbodies = (pmx_anchorRigidbody_t*)malloc(sizeof(pmx_anchorRigidbody_t) * softbody->AnchorRigidbodyCount);
+        for (uint32_t i = 0; i < softbody->AnchorRigidbodyCount; i++) {
+            pmx_anchorRigidbody_t* anchorRigidbody = &softbody->anchorRigidbodies[i];
+            pmxReadIndex(&anchorRigidbody->rigidBodyIndex, pmx->header.rigidbodyIndexSize, fd);
+            pmxRead(&anchorRigidbody->vertexIndex, sizeof(anchorRigidbody->vertexIndex), fd);
+            pmxRead(&anchorRigidbody->nearMode, sizeof(anchorRigidbody->nearMode), fd);
+        }
+
+        pmxRead(&softbody->pinVertexCount, sizeof(softbody->pinVertexCount), fd);
+        softbody->pinVertexIndices = (int32_t*)malloc(sizeof(int32_t) * softbody->pinVertexCount);
+        for (uint32_t i = 0; i < softbody->pinVertexCount; i++) {
+            pmxReadIndex(&softbody->pinVertexIndices[i], pmx->header.vertexIndexSize, fd);
+        }
+    }
+}
+
 pmx_t pmx;
 void read_file(char *filename)
 {
@@ -935,6 +1079,9 @@ void read_file(char *filename)
 
     pmxReadMorph(&pmx, fd);
     pmxReadDisplayFrame(&pmx, fd);
+    pmxReadRigidbody(&pmx, fd);
+    pmxReadJoint(&pmx, fd);
+    pmxReadSoftBody(&pmx, fd);
     fread(&buffer[0],sizeof(buffer),1,fd);
     fclose(fd);
 }
