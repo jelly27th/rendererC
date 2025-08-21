@@ -1,6 +1,15 @@
-#include "pmx.h"
+#include "pmxFile.h"
+
+#define PMXNAN -4.200000E-07
+
+static void Vector3disNAN(vector3d_t* vec) {
+    if (vec->x < PMXNAN) vec->x = 0.0f;
+    if (vec->y < PMXNAN) vec->y = 0.0f;
+    if (vec->z < PMXNAN) vec->z = 0.0f;
+}
 
 static void pmxRead(void* buffer, uint32_t size, FILE* fd) {
+    memset(buffer, 0, size);
     fread(buffer, size, 1, fd);
 }
 
@@ -74,12 +83,18 @@ static void pmxReadIndex(int32_t* index, uint8_t Type, FILE* fd) {
 static void pmxReadVertex(pmx_t* pmx, FILE* fd) {
     pmxRead(&(pmx->vertex.count), sizeof(pmx->vertex.count), fd);
     pmx->vertex.data = (pmx_vertex_data_t *)malloc(sizeof(pmx_vertex_data_t) * (pmx->vertex.count));
+    memset(pmx->vertex.data, 0, sizeof(pmx_vertex_data_t) * (pmx->vertex.count));
 
+    uint32_t c = 0;
     for (uint32_t index = 0; index < pmx->vertex.count; index++) {
         pmx_vertex_data_t* vertex = &(pmx->vertex.data[index]);
-
+        
         pmxRead(&(vertex->position), sizeof(vertex->position), fd);
+        //Vector3disNAN(&vertex->position);
+
         pmxRead(&(vertex->normal), sizeof(vertex->normal), fd);
+        //Vector3disNAN(&vertex->normal);
+
         pmxRead(&(vertex->uv), sizeof(vertex->uv), fd);
 
         if (0 != pmx->header.addUV4Num) {

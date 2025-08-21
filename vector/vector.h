@@ -28,4 +28,10 @@ typedef struct {
     };
 } vector4d_t;
 
+vector3d_t vector3d_Sub(vector3d_t va, vector3d_t vb);
+float vector3d_Length(vector3d_t va);
+vector3d_t vector3d_Mult(vector3d_t va, float k);
+vector3d_t vector3d_Normalize(vector3d_t va);
+vector3d_t vector3d_Cross(vector3d_t a, vector3d_t b);
+
 #endif

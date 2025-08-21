@@ -1,11 +1,12 @@
-#ifndef _PMX_H
-#define _PMX_H
+#ifndef _PMXFILE_H
+#define _PMXFILE_H
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
 #include <locale.h>
+#include <math.h>
 #include "../vector/vector.h"
 #include "../type/type.h"
 
@@ -86,6 +87,7 @@ typedef struct
     float32_t edgeMag; // Edge magnitude for SDEF
 
 } pmx_vertex_data_t;
+
 typedef struct {
     int32_t count;
     pmx_vertex_data_t* data; // Pointer to vertex data
@@ -110,7 +112,7 @@ typedef enum {
     GroundShadow = 0x02,
     DrawSelfShadow = 0x04,
     RecieveSelfShadow = 0x08,
-    DrawEdge = 0x10,
+    EdgeDraw = 0x10,
     VertexColor = 0x20,
     DrawPoint = 0x40,
     DrawLine = 0x80,
@@ -496,6 +498,7 @@ typedef struct {
     int32_t count; // Number of softbodies
     pmx_softbody_data_t* data; // Pointer to softbody data
 } pmx_softbody_t;
+
 typedef struct {
     pmx_header_t header; // PMX file header
     pmx_vertex_t vertex; // Vertex data
