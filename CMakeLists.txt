@@ -16,7 +16,9 @@ set(HEADER_FILES
     dyarray/dyarray.h
     pmx/pmxFile.h
     type/type.h
-    
+    camera/orbitCamera.h
+    win32/callback.h
+    log/log.h
 )
 
 set(SOURCE_FILES
@@ -27,6 +29,9 @@ set(SOURCE_FILES
     graphics/graphics.c
     win32/win32.c
     pmx/pmxFile.c
+    camera/orbitCamera.c
+    win32/callback.c
+    log/log.c
 )
 
 set(SRC_CUR main.c)

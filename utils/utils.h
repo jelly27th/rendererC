@@ -3,6 +3,8 @@
 
 #include "../point/point.h"
 
+#define EPSILON 1e-5f
+
 /* https://en.wikipedia.org/wiki/Radian */
 #define PI 3.1415926f
 #define radians_2_degrees(radians) ((radians) * (180.0 / PI))
@@ -10,5 +12,7 @@
 
 void swap_float(float *a, float *b);
 void swap_point2d(point2d_t *a, point2d_t *b);
+
+float float_clamp(float value, float min, float max);
 
 #endif

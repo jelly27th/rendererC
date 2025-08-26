@@ -3,10 +3,27 @@
   https://blog.csdn.net/lijian2017/article/details/139498000
 */
 #include "win32.h"
+#include <direct.h>
 
 LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
 
 TCHAR szAppName[] = TEXT("windows class");
+
+void initialize_path(void) {
+  #ifdef UNICODE
+      wchar_t path[MAX_PATH];
+      GetModuleFileName(NULL, path, MAX_PATH);
+      *wcsrchr(path, L'\\') = L'\0';
+      _wchdir(path);
+      _wchdir(L"assets");
+  #else
+      char path[MAX_PATH];
+      GetModuleFileName(NULL, path, MAX_PATH);
+      *strrchr(path, '\\') = '\0';
+      _chdir(path);
+      _chdir("assets");
+  #endif
+}
 
 void registerClass() {
   WNDCLASS wndclass;
@@ -23,6 +40,7 @@ void registerClass() {
   if (!RegisterClass(&wndclass)) {
     MessageBox(NULL, TEXT("This program requires Windows NT!"), szAppName, MB_ICONERROR);
   }
+  initialize_path();
 }
 
 void createWindow(windows_t* window) {
@@ -139,6 +157,43 @@ void stopFrameRateTickMS(windows_t* window) {
   } while (elapsed < window->frameRate);
 }
 
+static void handleKeyEvent(windows_t* window, WPARAM key, int action) {
+  keycode_t keycode;
+  switch (key) {
+    case 'A': keycode = KEY_A; break;
+    case 'D': keycode = KEY_D; break;
+    case 'S': keycode = KEY_S; break;
+    case 'W': keycode = KEY_W; break;
+    case VK_SPACE: keycode = KEY_SPACE; break;
+    default: return; // Unknown key
+  }
+
+  window->keys[keycode] = action;
+  if (window->callbacks.key_callback) {
+    window->callbacks.key_callback(window, keycode, action);
+  }
+}
+
+static void handleButtonEvent(windows_t* window, WPARAM button, int action) {
+  button_t buttoncode;
+  switch (button) {
+    case MK_LBUTTON: buttoncode = BUTTON_L; break;
+    case MK_RBUTTON: buttoncode = BUTTON_R; break;
+    default: return; // Unknown button
+  }
+
+  window->buttons[buttoncode] = action;
+  if (window->callbacks.button_callback) {
+    window->callbacks.button_callback(window, buttoncode, action);
+  }
+}
+
+static void handleScrollEvent(windows_t* window, float offset) {
+  if (window->callbacks.scroll_callback) {
+    window->callbacks.scroll_callback(window, offset);
+  }
+}
+
 LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam,
                          LPARAM lParam) {
   /* for get static variable see https://stackoverflow.com/questions/21369256/how-to-use-wndproc-as-a-class-function */
@@ -146,9 +201,54 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam,
   switch (message) {
     case WM_CLOSE:
         window->isClose = true;
+        break;
+    case WM_LBUTTONDOWN:
+      handleButtonEvent(window, wParam, 1);
+      break;
+    case WM_RBUTTONDOWN:
+      handleButtonEvent(window, wParam, 1);
+      break;
+    case WM_LBUTTONUP:
+      handleButtonEvent(window, wParam, 0);
+      break;
+    case WM_RBUTTONUP:
+      handleButtonEvent(window, wParam, 0);
+      break;
+    case WM_KEYUP:
+      handleKeyEvent(window, wParam, 0);
+      break;
+    case WM_KEYDOWN:
+      handleKeyEvent(window, wParam, 1);
+      break;
+    case WM_MOUSEWHEEL:
+      handleScrollEvent(window, (float)GET_WHEEL_DELTA_WPARAM(wParam) / WHEEL_DELTA);
+      break;
     case WM_DESTROY:
       PostQuitMessage(0);
       return 0;
   }
   return DefWindowProc(hwnd, message, wParam, lParam);
+}
+
+int getKeyState(windows_t* window, keycode_t keycode) {
+  return window->keys[keycode];
+}
+
+int getButtonState(windows_t* window, button_t buttoncode) {
+  return window->buttons[buttoncode];
+}
+
+POINT getQueryCursorPos(windows_t* window) {
+    POINT pos;
+    GetCursorPos(&pos);
+    ScreenToClient(window->hwnd, &pos);
+    return pos;
+}
+
+void setUserData(windows_t* window, void* user_data) {
+    window->user_data = user_data;
+}
+
+void* getUserData(windows_t* window) {
+    return window->user_data;
 }

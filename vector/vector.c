@@ -1,4 +1,5 @@
 #include "vector.h"
+#include <math.h>
 
 /*                  ----> */
 /* create  a vector vbva  */
@@ -53,4 +54,34 @@ vector3d_t vector3d_Cross(vector3d_t a, vector3d_t b) {
     c.z =  ( (a.x * b.y) - (a.y * b.x) );
 
     return c;
+} 
+
+vector3d_t vector3d_Add(vector3d_t va, vector3d_t vb) {
+    vector3d_t vsum;
+
+    vsum.x = va.x + vb.x;
+    vsum.y = va.y + vb.y;
+    vsum.z = va.z + vb.z;
+    return(vsum);
+} 
+
+vector2d_t vector2d_Add(vector2d_t va, vector2d_t vb) {
+    vector2d_t vsum;
+    vsum.x = va.x + vb.x;
+    vsum.y = va.y + vb.y;
+    return(vsum);
+} 
+
+vector2d_t vector2d_Sub(vector2d_t va, vector2d_t vb) {
+    vector2d_t vdiff;
+    vdiff.x = va.x - vb.x;
+    vdiff.y = va.y - vb.y;
+    return(vdiff);  
+} 
+
+vector2d_t vector2d_Mult(float k, vector2d_t va) {
+    vector2d_t vscaled;
+    vscaled.x = k*va.x;
+    vscaled.y = k*va.y;
+    return(vscaled);
 } 

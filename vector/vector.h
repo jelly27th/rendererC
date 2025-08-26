@@ -33,5 +33,10 @@ float vector3d_Length(vector3d_t va);
 vector3d_t vector3d_Mult(vector3d_t va, float k);
 vector3d_t vector3d_Normalize(vector3d_t va);
 vector3d_t vector3d_Cross(vector3d_t a, vector3d_t b);
+vector3d_t vector3d_Add(vector3d_t va, vector3d_t vb);
+
+vector2d_t vector2d_Add(vector2d_t va, vector2d_t vb);
+vector2d_t vector2d_Sub(vector2d_t va, vector2d_t vb);
+vector2d_t vector2d_Mult(float k, vector2d_t va);
 
 #endif

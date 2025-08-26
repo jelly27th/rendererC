@@ -1,9 +1,11 @@
 #include "win32/win32.h"
+#include "win32/callback.h"
 #include "vector/vector.h"
 #include "matrix/matrix.h"
 #include "framebuffer/framebuffer.h"
 #include "graphics/graphics.h"
 #include "pmx/pmxFile.h"
+#include "camera/orbitCamera.h"
 
 int main() {
   
@@ -11,6 +13,10 @@ int main() {
   if (window == NULL) {
     return 0;
   }
+  window->callbacks.button_callback = button_callback;
+  window->callbacks.scroll_callback = scroll_callback;
+  window->callbacks.key_callback = NULL; // No key callback for now
+  
   framebuffer_t* framebuffer = createFramebuffer(window->width, window->height);
 
   registerClass();
@@ -18,16 +24,21 @@ int main() {
   createScreen(window);
   setFrameRate(window, 60);
 
-  pmx_t* pmx = pmxReadFile("C:\\Users\\dong\\Downloads\\xiao\\xiao.pmx");
+  orbit_camera_t* camera = create_orbit_camera((vector3d_t){0, 25, 25}, (vector3d_t){0, 5, -10}, (float)window->width / (float)window->height);
+  record_t record = {0};
+  setUserData(window, &record);
+
+  pmx_t* pmx = pmxReadFile("xiao\\xiao.pmx");
   while (!window->isClose) {
 
     startFrameRateTickMS(window);
 
     /* Render your scene here start */
-    matrix4x4_t camera = matrix4x4_lookAt((vector3d_t){0, 25, 25}, (vector3d_t){0, 5, -10}, (vector3d_t){0, 1, 0});
-    matrix4x4_t projection = matrix4x4_perspective(60.0f, (float)window->width / (float)window->height, 0.1f, 1000.0f);
+    orbitCamera_update(window, camera, &record);
+    // matrix4x4_t camera = matrix4x4_lookAt((vector3d_t){0, 25, 25}, (vector3d_t){0, 5, -10}, (vector3d_t){0, 1, 0});
+    // matrix4x4_t projection = matrix4x4_perspective(60.0f, (float)window->width / (float)window->height, 0.1f, 1000.0f);
     matrix4x4_t viewport = matrix4x4_viewport(window->width, window->height);
-    matrix4x4_t vp = matrix4x4_mult_4x4(projection, camera);
+    matrix4x4_t vp = get_view_projection_matrix(camera);
 
     for (int i = 0; i < pmx->face.count; i++) {
         for (int j=0; j<3; j++) { 
@@ -71,6 +82,7 @@ int main() {
   }
 
   destroyFramebuffer(framebuffer);
+  destroy_orbit_camera(camera);
 
   return 0;
 }

@@ -11,3 +11,7 @@ void swap_point2d(point2d_t* a, point2d_t* b) {
   *a = *b;
   *b = tmp;
 }
+
+float float_clamp(float value, float min, float max) {
+  return value < min ? min : (value > max ? max : value);
+}
