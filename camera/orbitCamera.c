@@ -66,8 +66,8 @@ static vector3d_t calculatePanOffset(orbit_camera_t* camera, motion_t* motion) {
 */
 static vector3d_t calculate_OrbitAndDollyOffset(orbit_camera_t* camera, motion_t* motion) {
 
-    vector3d_t lookAt = vector3d_Sub(camera->target, camera->eye);
-    
+    vector3d_t lookAt = vector3d_Sub(camera->eye, camera->target);
+
     float radius = vector3d_Length(lookAt);
     float polar = acosf(lookAt.y / radius);
     float azimuth = atan2f(lookAt.x, lookAt.z);
@@ -89,8 +89,8 @@ void update_orbitCamera_status(orbit_camera_t* camera, motion_t* motion) {
     vector3d_t panOffset = calculatePanOffset(camera, motion);
     vector3d_t orbitDollyOffset = calculate_OrbitAndDollyOffset(camera, motion);
 
-    camera->target = vector3d_Add(camera->eye, panOffset);
-    camera->eye = vector3d_Add(camera->eye, orbitDollyOffset);
+    camera->target = vector3d_Add(camera->target, panOffset);
+    camera->eye = vector3d_Add(camera->target, orbitDollyOffset);
 }
 
 /* Get the view matrix and projection matrix */ 

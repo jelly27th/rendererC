@@ -57,13 +57,14 @@ void createWindow(windows_t* window) {
 
 windows_t* initWindow(int width, int height) {
   windows_t* window = (windows_t*)malloc(sizeof(windows_t));
+
+  memset(window, 0, sizeof(windows_t)); // Initialize all members to zero
   window->width = width;
   window->height = height;
-  window->hwnd = NULL;
-  window->memoryHdc = NULL;
-  window->framebuffer = NULL;
+
   window->frameRate = 60; // default frame rate
   window->lastTick = 0;
+  
   window->isClose = false;
 
   return window;
@@ -174,17 +175,11 @@ static void handleKeyEvent(windows_t* window, WPARAM key, int action) {
   }
 }
 
-static void handleButtonEvent(windows_t* window, WPARAM button, int action) {
-  button_t buttoncode;
-  switch (button) {
-    case MK_LBUTTON: buttoncode = BUTTON_L; break;
-    case MK_RBUTTON: buttoncode = BUTTON_R; break;
-    default: return; // Unknown button
-  }
+static void handleButtonEvent(windows_t* window, button_t button, int action) {
 
-  window->buttons[buttoncode] = action;
+  window->buttons[button] = action;
   if (window->callbacks.button_callback) {
-    window->callbacks.button_callback(window, buttoncode, action);
+    window->callbacks.button_callback(window, button, action);
   }
 }
 
@@ -203,16 +198,16 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam,
         window->isClose = true;
         break;
     case WM_LBUTTONDOWN:
-      handleButtonEvent(window, wParam, 1);
-      break;
-    case WM_RBUTTONDOWN:
-      handleButtonEvent(window, wParam, 1);
+      handleButtonEvent(window, BUTTON_L, 1);
       break;
     case WM_LBUTTONUP:
-      handleButtonEvent(window, wParam, 0);
+      handleButtonEvent(window, BUTTON_L, 0);
+      break;
+    case WM_RBUTTONDOWN:
+      handleButtonEvent(window, BUTTON_R, 1);
       break;
     case WM_RBUTTONUP:
-      handleButtonEvent(window, wParam, 0);
+      handleButtonEvent(window, BUTTON_R, 0);
       break;
     case WM_KEYUP:
       handleKeyEvent(window, wParam, 0);

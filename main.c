@@ -6,6 +6,7 @@
 #include "graphics/graphics.h"
 #include "pmx/pmxFile.h"
 #include "camera/orbitCamera.h"
+#include "log/log.h"
 
 int main() {
   
@@ -35,11 +36,13 @@ int main() {
 
     /* Render your scene here start */
     orbitCamera_update(window, camera, &record);
-    // matrix4x4_t camera = matrix4x4_lookAt((vector3d_t){0, 25, 25}, (vector3d_t){0, 5, -10}, (vector3d_t){0, 1, 0});
-    // matrix4x4_t projection = matrix4x4_perspective(60.0f, (float)window->width / (float)window->height, 0.1f, 1000.0f);
+
     matrix4x4_t viewport = matrix4x4_viewport(window->width, window->height);
     matrix4x4_t vp = get_view_projection_matrix(camera);
 
+    memset(framebuffer->color_buffer, 0, sizeof(color_t) * framebuffer->width * framebuffer->height);
+    // drawScreen(window, framebuffer);
+    
     for (int i = 0; i < pmx->face.count; i++) {
         for (int j=0; j<3; j++) { 
           int index1 = pmx->face.data[i].indices[j];
@@ -71,6 +74,10 @@ int main() {
           draw2d_Line(line, &color, framebuffer);
       }
     }
+
+    record.orbit_delta = (vector2d_t){0, 0};
+    record.pan_delta = (vector2d_t){0, 0};
+    record.dolly_delta = 0;
 
     /* Render your scene here end */
     drawScreen(window, framebuffer);
