@@ -80,3 +80,32 @@ void draw2d_Line(line2d_t line, color_t* color, framebuffer_t* framebuffer) {
     }
   }
 }
+
+typedef struct {point2d_t min, max;} Bbox_t;
+Bbox_t find_bounding_box(point2d_t v0, point2d_t v1, point2d_t v2) {
+  Bbox_t box;
+  box.min = point2d_min(point2d_min(v0, v1), v2);
+  box.max = point2d_max(point2d_max(v0, v1), v2);
+  return box;
+}
+
+void graphics_draw_Triangle(point2d_t p0, point2d_t p1, point2d_t p2, color_t* color, framebuffer_t* framebuffer) {
+
+  // find bounding box AABB（Axis-Aligned Bounding Boxes)
+  Bbox_t AABB_box = find_bounding_box(p0, p1, p2);
+
+  // raster triangles
+  for (float x = AABB_box.min.x; x < AABB_box.max.x; x++) {
+    for (float y = AABB_box.min.y; y < AABB_box.max.y; y++) {
+      point2d_t p = {x, y};
+
+      point3d_t barycoord = barycentric(p, p0, p1, p2);
+      // handling accuracy issues. 
+      // if `-0.01` is `0`, maybe some point from model will discard in rendering.
+      if (barycoord.x < 0.0|| barycoord.y < 0.0 || barycoord.z < 0.0) {
+        continue; 
+      }
+      draw2d_Point(p, color, framebuffer);
+    }
+  }
+}

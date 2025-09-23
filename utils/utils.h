@@ -2,6 +2,8 @@
 #define _UTILS_H
 
 #include "../point/point.h"
+#include "../type/type.h"
+#include <stdio.h>
 
 #define EPSILON 1e-5f
 
@@ -14,5 +16,7 @@ void swap_float(float *a, float *b);
 void swap_point2d(point2d_t *a, point2d_t *b);
 
 float float_clamp(float value, float min, float max);
+
+void read_file_bytes(void* buffer, uint32_t size, FILE* fd);
 
 #endif

@@ -19,6 +19,8 @@ set(HEADER_FILES
     camera/orbitCamera.h
     win32/callback.h
     log/log.h
+    maths/maths.h
+    bmp/bmpFile.h
 )
 
 set(SOURCE_FILES
@@ -32,6 +34,9 @@ set(SOURCE_FILES
     camera/orbitCamera.c
     win32/callback.c
     log/log.c
+    maths/maths.c
+    point/point.c
+    bmp/bmpFile.c
 )
 
 set(SRC_CUR main.c)

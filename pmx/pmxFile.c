@@ -1,16 +1,7 @@
 #include "pmxFile.h"
 
-#define PMXNAN -4.200000E-07
-
-static void Vector3disNAN(vector3d_t* vec) {
-    if (vec->x < PMXNAN) vec->x = 0.0f;
-    if (vec->y < PMXNAN) vec->y = 0.0f;
-    if (vec->z < PMXNAN) vec->z = 0.0f;
-}
-
 static void pmxRead(void* buffer, uint32_t size, FILE* fd) {
-    memset(buffer, 0, size);
-    fread(buffer, size, 1, fd);
+    read_file_bytes(buffer, size, fd);
 }
 
 static void pmxReadString(pmx_text_t* string, FILE* fd) {
@@ -90,10 +81,8 @@ static void pmxReadVertex(pmx_t* pmx, FILE* fd) {
         pmx_vertex_data_t* vertex = &(pmx->vertex.data[index]);
         
         pmxRead(&(vertex->position), sizeof(vertex->position), fd);
-        //Vector3disNAN(&vertex->position);
 
         pmxRead(&(vertex->normal), sizeof(vertex->normal), fd);
-        //Vector3disNAN(&vertex->normal);
 
         pmxRead(&(vertex->uv), sizeof(vertex->uv), fd);
 
