@@ -1,12 +1,12 @@
-#include "win32/win32.h"
-#include "win32/callback.h"
-#include "vector/vector.h"
-#include "matrix/matrix.h"
-#include "framebuffer/framebuffer.h"
-#include "graphics/graphics.h"
-#include "pmx/pmxFile.h"
-#include "camera/orbitCamera.h"
-#include "log/log.h"
+#include "source/win32/win32.h"
+#include "source/win32/callback.h"
+#include "source/vector/vector.h"
+#include "source/matrix/matrix.h"
+#include "source/framebuffer/framebuffer.h"
+#include "source/graphics/graphics.h"
+#include "source/pmx/pmxFile.h"
+#include "source/camera/orbitCamera.h"
+#include "source/log/log.h"
 
 int main() {
   
