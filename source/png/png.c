@@ -1,6 +1,7 @@
 #include "png.h"
 #include <string.h>
 #include <stdlib.h>
+#include "../utils/utils.h"
 #include "../dyarray/dyarray.h"
 
 /* https://en.wikipedia.org/wiki/PNG */
@@ -210,6 +211,12 @@ static unsigned pngReadBits(pngBitReader* reader, uint8_t nbits) {
   return result;
 }
 
+static unsigned pngReverseBits(unsigned bits, unsigned num) {
+  unsigned i, result = 0;
+  for(i = 0; i < num; i++) result |= ((bits >> (num - i - 1u)) & 1u) << i;
+  return result;
+}
+
 /* 
     no compression block format
     0   1   2   3   4...
@@ -262,7 +269,108 @@ static void HuffmanTree_init(HuffmanTree* tree) {
     tree->table_value = NULL;
 }
 
+#define FIRSTBITS 9u
+#define INVALIDBITS 16u
+#define INVALIDSYMBOL 65535u
+
 static void HuffmanTree_makeTable(HuffmanTree* tree) {
+  static const unsigned headsize = 1u << FIRSTBITS; /*size of the first table*/
+  static const unsigned mask = (1u << FIRSTBITS) - 1u;
+  size_t i, numpresent, pointer, size; /*total table size*/
+  unsigned* maxlens = (unsigned*)malloc(headsize * sizeof(unsigned));
+
+  /* compute maxlens: max total bit length of symbols sharing prefix in the first table*/
+  memset(maxlens, 0, headsize * sizeof(*maxlens));
+  for(i = 0; i < tree->numcodes; i++) {
+    unsigned symbol = tree->codes[i];
+    unsigned bitlen = tree->lengths[i];
+    unsigned index;
+    if(bitlen <= FIRSTBITS) continue; /*symbols that fit in first table don't increase secondary table size*/
+    /*get the FIRSTBITS MSBs, the MSBs of the symbol are encoded first. */
+    index = pngReverseBits(symbol >> (bitlen - FIRSTBITS), FIRSTBITS);
+    maxlens[index] = MAX(maxlens[index], bitlen);
+  }
+
+  /* compute total table size: size of first table plus all secondary tables for symbols longer than FIRSTBITS */
+  size = headsize;
+  for(i = 0; i < headsize; ++i) {
+    unsigned bitLen = maxlens[i];
+    if(bitLen > FIRSTBITS) size += (((size_t)1) << (bitLen - FIRSTBITS));
+  }
+  tree->table_len = (unsigned char*)malloc(size * sizeof(*tree->table_len));
+  tree->table_value = (unsigned short*)malloc(size * sizeof(*tree->table_value));
+
+  /*initialize with an invalid length to indicate unused entries*/
+  for(i = 0; i < size; ++i) tree->table_len[i] = INVALIDBITS;
+
+  /*fill in the first table for long symbols: max prefix size and pointer to secondary tables*/
+  pointer = headsize;
+  for(i = 0; i < headsize; ++i) {
+    unsigned bitLen = maxlens[i];
+    if(bitLen <= FIRSTBITS) continue;
+    tree->table_len[i] = bitLen;
+    tree->table_value[i] = (unsigned short)pointer;
+    pointer += (((size_t)1) << (bitLen - FIRSTBITS));
+  }
+  free(maxlens);
+
+  /*fill in the first table for short symbols, or secondary table for long symbols*/
+  numpresent = 0;
+  for(i = 0; i < tree->numcodes; ++i) {
+    unsigned bitLen = tree->lengths[i];
+    unsigned symbol, reverse;
+    if(bitLen == 0) continue;
+    symbol = tree->codes[i]; /*the huffman bit pattern. i itself is the value.*/
+    /*reverse bits, because the huffman bits are given in MSB first order but the bit reader reads LSB first*/
+    reverse = pngReverseBits(symbol, bitLen);
+    numpresent++;
+
+    if(bitLen <= FIRSTBITS) {
+      /*short symbol, fully in first table, replicated num times if bitLen < FIRSTBITS*/
+      unsigned num = 1u << (FIRSTBITS - bitLen);
+      unsigned j;
+      for(j = 0; j < num; ++j) {
+        /*bit reader will read the bitLen bits of symbol first, the remaining FIRSTBITS - bitLen bits go to the MSB's*/
+        unsigned index = reverse | (j << bitLen);
+        if(tree->table_len[index] != INVALIDBITS) return ; /*invalid tree: long symbol shares prefix with short symbol*/
+        tree->table_len[index] = bitLen;
+        tree->table_value[index] = (unsigned short)i;
+      }
+    } else {
+      /*long symbol, shares prefix with other long symbols in first lookup table, needs second lookup*/
+      /*the FIRSTBITS MSBs of the symbol are the first table index*/
+      unsigned index = reverse & mask;
+      unsigned maxlen = tree->table_len[index];
+      /*log2 of secondary table length, should be >= bitLen - FIRSTBITS*/
+      unsigned tablelen = maxlen - FIRSTBITS;
+      unsigned start = tree->table_value[index]; /*starting index in secondary table*/
+      unsigned num = 1u << (tablelen - (bitLen - FIRSTBITS)); /*amount of entries of this symbol in secondary table*/
+      unsigned j;
+      if(maxlen < bitLen) return ; /*invalid tree: long symbol shares prefix with short symbol*/
+      for(j = 0; j < num; ++j) {
+        unsigned reverse2 = reverse >> FIRSTBITS; /* bitLen - FIRSTBITS bits */
+        unsigned index2 = start + (reverse2 | (j << (bitLen - FIRSTBITS)));
+        tree->table_len[index2] = bitLen;
+        tree->table_value[index2] = (unsigned short)i;
+      }
+    }
+  }
+
+  /* error check */
+  if(numpresent < 2) {
+    /* if only has 1 symbol, fill in the remaining table with invalid values */
+    for(i = 0; i < size; ++i) {
+      if(tree->table_len[i] == INVALIDBITS) {
+        tree->table_len[i] = (i < headsize) ? 1 : (FIRSTBITS + 1);
+        tree->table_value[i] = INVALIDSYMBOL;
+      }
+    }
+  } else {
+    /* check huffman tree whether is invaild */
+    for(i = 0; i < size; ++i) {
+      if(tree->table_len[i] == INVALIDBITS) return; 
+    }
+  }
 
 }
 
@@ -322,12 +430,22 @@ static void generateFixedLitLenTree(HuffmanTree* tree) {
 }
 
 static void generateFixedDistanceTree(HuffmanTree* tree) {
+  unsigned* bitlen = (unsigned*)lodepng_malloc(NUM_DISTANCE_SYMBOLS * sizeof(unsigned));
 
+  /*there are 32 distance codes, but 30-31 are unused*/
+  for(unsigned i = 0; i != NUM_DISTANCE_SYMBOLS; ++i) bitlen[i] = 5;
+  HuffmanTree_makeFromLengths(tree, bitlen, NUM_DISTANCE_SYMBOLS, 15);
+
+  free(bitlen);
 }
 
 static void getTreeInflateFixed(HuffmanTree* literalLengthTree, HuffmanTree* distanceTree) {
     generateFixedLitLenTree(literalLengthTree);
     generateFixedDistanceTree(distanceTree);
+}
+
+static void getTreeInflateDynamic(HuffmanTree* literalLengthTree, HuffmanTree* distanceTree, pngBitReader* bitReader) {
+    /* to be implemented */
 }
 
 static void pngInflateHuffmanBlock(vector_uint8_t* out, pngBitReader* bitReader, uint8_t BTYPE, png_t* png) {
@@ -342,7 +460,7 @@ static void pngInflateHuffmanBlock(vector_uint8_t* out, pngBitReader* bitReader,
         getTreeInflateFixed(&literalLengthTree, &distanceTree);
     } else if (2 == BTYPE) {
         /* dynamic Huffman codes */
-        /* to be implemented */
+        getTreeInflateDynamic(&literalLengthTree, &distanceTree, bitReader);
     }
 
     /* to be implemented */

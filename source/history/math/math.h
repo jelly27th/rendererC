@@ -141,7 +141,7 @@ const MATRIX3X3_T IMAT_3X3 = {
 #define PARM_LINE_INTERSECT_EVERYWHERE  3
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
-#define MAX(a, b) ((a) > (b) ? (b) : (a))
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
 #define SWAP(a, b, t) {t = a; a = b; b = t;}
 #define DEG_TO_RAD(ang) ((ang) * PI / 180.0f)
 #define RAD_TO_DEG(rad) ((rad) * 180.0f / PI)
