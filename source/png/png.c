@@ -445,7 +445,135 @@ static void getTreeInflateFixed(HuffmanTree* literalLengthTree, HuffmanTree* dis
 }
 
 static void getTreeInflateDynamic(HuffmanTree* literalLengthTree, HuffmanTree* distanceTree, pngBitReader* bitReader) {
-    /* to be implemented */
+  /*make sure that length values that aren't filled in will be 0, or a wrong tree will be generated*/
+  unsigned n, HLIT, HDIST, HCLEN, i;
+
+  /*see comments in deflateDynamic for explanation of the context and these variables, it is analogous*/
+  unsigned* bitlen_ll = 0; /*lit,len code lengths*/
+  unsigned* bitlen_d = 0; /*dist code lengths*/
+  /*code length code lengths ("clcl"), the bit lengths of the huffman tree used to compress bitlen_ll and bitlen_d*/
+  unsigned* bitlen_cl = 0;
+  HuffmanTree tree_cl; /*the code tree for code length codes (the huffman tree for compressed huffman trees)*/
+
+  if(bitReader->bitsize - bitReader->bp < 14) return 49; /*error: the bit pointer is or will go past the memory*/
+  ensureBits17(bitReader, 14);
+
+  /*number of literal/length codes + 257. Unlike the spec, the value 257 is added to it here already*/
+  HLIT =  readBits(bitReader, 5) + 257;
+  /*number of distance codes. Unlike the spec, the value 1 is added to it here already*/
+  HDIST = readBits(reader, 5) + 1;
+  /*number of code length codes. Unlike the spec, the value 4 is added to it here already*/
+  HCLEN = readBits(reader, 4) + 4;
+
+  bitlen_cl = (unsigned*)lodepng_malloc(NUM_CODE_LENGTH_CODES * sizeof(unsigned));
+  if(!bitlen_cl) return 83 /*alloc fail*/;
+
+  HuffmanTree_init(&tree_cl);
+
+  while(!error) {
+    /*read the code length codes out of 3 * (amount of code length codes) bits*/
+    if(lodepng_gtofl(reader->bp, HCLEN * 3, reader->bitsize)) {
+      ERROR_BREAK(50); /*error: the bit pointer is or will go past the memory*/
+    }
+    for(i = 0; i != HCLEN; ++i) {
+      ensureBits9(reader, 3); /*out of bounds already checked above */
+      bitlen_cl[CLCL_ORDER[i]] = readBits(reader, 3);
+    }
+    for(i = HCLEN; i != NUM_CODE_LENGTH_CODES; ++i) {
+      bitlen_cl[CLCL_ORDER[i]] = 0;
+    }
+
+    error = HuffmanTree_makeFromLengths(&tree_cl, bitlen_cl, NUM_CODE_LENGTH_CODES, 7);
+    if(error) break;
+
+    /*now we can use this tree to read the lengths for the tree that this function will return*/
+    bitlen_ll = (unsigned*)lodepng_malloc(NUM_DEFLATE_CODE_SYMBOLS * sizeof(unsigned));
+    bitlen_d = (unsigned*)lodepng_malloc(NUM_DISTANCE_SYMBOLS * sizeof(unsigned));
+    if(!bitlen_ll || !bitlen_d) ERROR_BREAK(83 /*alloc fail*/);
+    lodepng_memset(bitlen_ll, 0, NUM_DEFLATE_CODE_SYMBOLS * sizeof(*bitlen_ll));
+    lodepng_memset(bitlen_d, 0, NUM_DISTANCE_SYMBOLS * sizeof(*bitlen_d));
+
+    /*i is the current symbol we're reading in the part that contains the code lengths of lit/len and dist codes*/
+    i = 0;
+    while(i < HLIT + HDIST) {
+      unsigned code;
+      ensureBits25(reader, 22); /* up to 15 bits for huffman code, up to 7 extra bits below*/
+      code = huffmanDecodeSymbol(reader, &tree_cl);
+      if(code <= 15) /*a length code*/ {
+        if(i < HLIT) bitlen_ll[i] = code;
+        else bitlen_d[i - HLIT] = code;
+        ++i;
+      } else if(code == 16) /*repeat previous*/ {
+        unsigned replength = 3; /*read in the 2 bits that indicate repeat length (3-6)*/
+        unsigned value; /*set value to the previous code*/
+
+        if(i == 0) ERROR_BREAK(54); /*can't repeat previous if i is 0*/
+
+        replength += readBits(reader, 2);
+
+        if(i < HLIT + 1) value = bitlen_ll[i - 1];
+        else value = bitlen_d[i - HLIT - 1];
+        /*repeat this value in the next lengths*/
+        for(n = 0; n < replength; ++n) {
+          if(i >= HLIT + HDIST) ERROR_BREAK(13); /*error: i is larger than the amount of codes*/
+          if(i < HLIT) bitlen_ll[i] = value;
+          else bitlen_d[i - HLIT] = value;
+          ++i;
+        }
+      } else if(code == 17) /*repeat "0" 3-10 times*/ {
+        unsigned replength = 3; /*read in the bits that indicate repeat length*/
+        replength += readBits(reader, 3);
+
+        /*repeat this value in the next lengths*/
+        for(n = 0; n < replength; ++n) {
+          if(i >= HLIT + HDIST) ERROR_BREAK(14); /*error: i is larger than the amount of codes*/
+
+          if(i < HLIT) bitlen_ll[i] = 0;
+          else bitlen_d[i - HLIT] = 0;
+          ++i;
+        }
+      } else if(code == 18) /*repeat "0" 11-138 times*/ {
+        unsigned replength = 11; /*read in the bits that indicate repeat length*/
+        replength += readBits(reader, 7);
+
+        /*repeat this value in the next lengths*/
+        for(n = 0; n < replength; ++n) {
+          if(i >= HLIT + HDIST) ERROR_BREAK(15); /*error: i is larger than the amount of codes*/
+
+          if(i < HLIT) bitlen_ll[i] = 0;
+          else bitlen_d[i - HLIT] = 0;
+          ++i;
+        }
+      } else /*if(code == INVALIDSYMBOL)*/ {
+        ERROR_BREAK(16); /*error: tried to read disallowed huffman symbol*/
+      }
+      /*check if any of the ensureBits above went out of bounds*/
+      if(reader->bp > reader->bitsize) {
+        /*return error code 10 or 11 depending on the situation that happened in huffmanDecodeSymbol
+        (10=no endcode, 11=wrong jump outside of tree)*/
+        /* TODO: revise error codes 10,11,50: the above comment is no longer valid */
+        ERROR_BREAK(50); /*error, bit pointer jumps past memory*/
+      }
+    }
+    if(error) break;
+
+    if(bitlen_ll[256] == 0) ERROR_BREAK(64); /*the length of the end code 256 must be larger than 0*/
+
+    /*now we've finally got HLIT and HDIST, so generate the code trees, and the function is done*/
+    error = HuffmanTree_makeFromLengths(tree_ll, bitlen_ll, NUM_DEFLATE_CODE_SYMBOLS, 15);
+    if(error) break;
+    error = HuffmanTree_makeFromLengths(tree_d, bitlen_d, NUM_DISTANCE_SYMBOLS, 15);
+
+    break; /*end of error-while*/
+  }
+
+  lodepng_free(bitlen_cl);
+  lodepng_free(bitlen_ll);
+  lodepng_free(bitlen_d);
+  HuffmanTree_cleanup(&tree_cl);
+
+  return error;
+
 }
 
 static void pngInflateHuffmanBlock(vector_uint8_t* out, pngBitReader* bitReader, uint8_t BTYPE, png_t* png) {
