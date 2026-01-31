@@ -14,16 +14,20 @@ static void pngRead(void* buffer, uint32_t size, FILE* fd) {
     fread(buffer, size, 1, fd);
 }
 
+static unsigned pngRead32bit(const unsigned char* buffer) {
+  return (((unsigned)buffer[0] << 24u) | ((unsigned)buffer[1] << 16u) |
+         ((unsigned)buffer[2] << 8u) | (unsigned)buffer[3]);
+}
+
 static void pngReadUint32(void* buffer, uint32_t size, FILE* fd) {
     uint8_t bytes[4] = {0}; /* chunk length is 4 bytes */
-    uint32_t value = 0;
 
     memset(buffer, 0, size);
     fread(bytes, size, 1, fd);
 
     /* convert big-endian to little-endian */
-    value = (bytes[0] << 24) | (bytes[1] << 16) | (bytes[2] << 8) | bytes[3];
-    (*(uint32_t*)buffer) = value;
+    // value = (bytes[0] << 24) | (bytes[1] << 16) | (bytes[2] << 8) | bytes[3];
+    (*(uint32_t*)buffer) = pngRead32bit(bytes);
 }
 
 static void pngReadFileHeader(png_t* png, FILE* fd) {
@@ -223,6 +227,24 @@ static void pngEnsureBits25(pngBitReader* reader) {
     if(start + 0u < size) reader->buffer |= reader->data[start + 0];
     if(start + 1u < size) reader->buffer |= ((unsigned)reader->data[start + 1] << 8u);
     if(start + 2u < size) reader->buffer |= ((unsigned)reader->data[start + 2] << 16u);
+    reader->buffer >>= (reader->bp & 7u);
+  }
+}
+
+static void pngEnsureBits32(pngBitReader* reader) {
+  size_t start = reader->bp >> 3u;
+  size_t size = reader->size;
+  if(start + 4u < size) {
+    reader->buffer = (unsigned)reader->data[start + 0] | ((unsigned)reader->data[start + 1] << 8u) |
+                     ((unsigned)reader->data[start + 2] << 16u) | ((unsigned)reader->data[start + 3] << 24u);
+    reader->buffer >>= (reader->bp & 7u);
+    reader->buffer |= (((unsigned)reader->data[start + 4] << 24u) << (8u - (reader->bp & 7u)));
+  } else {
+    reader->buffer = 0;
+    if(start + 0u < size) reader->buffer |= reader->data[start + 0];
+    if(start + 1u < size) reader->buffer |= ((unsigned)reader->data[start + 1] << 8u);
+    if(start + 2u < size) reader->buffer |= ((unsigned)reader->data[start + 2] << 16u);
+    if(start + 3u < size) reader->buffer |= ((unsigned)reader->data[start + 3] << 24u);
     reader->buffer >>= (reader->bp & 7u);
   }
 }
@@ -666,84 +688,80 @@ static void pngInflateHuffmanBlock(vector_uint8_t* out, pngBitReader* bitReader,
         getTreeInflateDynamic(&literalLengthTree, &distanceTree, bitReader);
     }
 
-    while(!done) /*decode all symbols until end reached, breaks at end code*/ {
-    /*code_ll is literal, length or end code*/
-    unsigned code_ll;
-    /* ensure enough bits for 2 huffman code reads (15 bits each): if the first is a literal, a second literal is read at once. This
-    appears to be slightly faster, than ensuring 20 bits here for 1 huffman symbol and the potential 5 extra bits for the length symbol.*/
-    pngEnsureBits32(bitReader);
-    code_ll = huffmanDecodeSymbol(bitReader, &literalLengthTree);
-    if(code_ll <= 255) {
-      /*slightly faster code path if multiple literals in a row*/
-      out->data[out->len++] = (unsigned char)code_ll;
+    /*decode all symbols until end reached, breaks at end code*/
+    while(!done)  {
+      /*code_ll is literal, length or end code*/
+      unsigned code_ll;
+      /* ensure enough bits for 2 huffman code reads (15 bits each): if the first is a literal, a second literal is read at once. This
+      appears to be slightly faster, than ensuring 20 bits here for 1 huffman symbol and the potential 5 extra bits for the length symbol.*/
+      pngEnsureBits32(bitReader);
       code_ll = huffmanDecodeSymbol(bitReader, &literalLengthTree);
-    }
-    if(code_ll <= 255) /*literal symbol*/ {
-      out->data[out->len++] = (unsigned char)code_ll;
-    } else if(code_ll >= FIRST_LENGTH_CODE_INDEX && code_ll <= LAST_LENGTH_CODE_INDEX) /*length code*/ {
-      unsigned code_d, distance;
-      unsigned numextrabits_l, numextrabits_d; /*extra bits for length and distance*/
-      size_t start, backward, length;
-
-      /*part 1: get length base*/
-      length = LENGTHBASE[code_ll - FIRST_LENGTH_CODE_INDEX];
-
-      /*part 2: get extra bits and add the value of that to length*/
-      numextrabits_l = LENGTHEXTRA[code_ll - FIRST_LENGTH_CODE_INDEX];
-      if(numextrabits_l != 0) {
-        /* bits already ensured above */
-        pngEnsureBits25(bitReader);
-        length += pngReadBits(bitReader, numextrabits_l);
+      if(code_ll <= 255) {
+        /*slightly faster code path if multiple literals in a row*/
+        out->data[out->len++] = (unsigned char)code_ll;
+        code_ll = huffmanDecodeSymbol(bitReader, &literalLengthTree);
       }
+      if(code_ll <= 255) /*literal symbol*/ {
+        out->data[out->len++] = (unsigned char)code_ll;
+      } else if(code_ll >= FIRST_LENGTH_CODE_INDEX && code_ll <= LAST_LENGTH_CODE_INDEX) /*length code*/ {
+        unsigned code_d, distance;
+        unsigned numextrabits_l, numextrabits_d; /*extra bits for length and distance*/
+        size_t start, backward, length;
 
-      /*part 3: get distance code*/
-      pngEnsureBits32(bitReader); /* up to 15 for the huffman symbol, up to 13 for the extra bits */
-      code_d = huffmanDecodeSymbol(bitReader, &distanceTree);
-      if(code_d > 29) {
-        if(code_d <= 31) {
-          return; /*error: invalid distance code (30-31 are never used)*/
-        } else /* if(code_d == INVALIDSYMBOL) */{
-          return; /*error: tried to read disallowed huffman symbol*/
+        /*part 1: get length base*/
+        length = LENGTHBASE[code_ll - FIRST_LENGTH_CODE_INDEX];
+
+        /*part 2: get extra bits and add the value of that to length*/
+        numextrabits_l = LENGTHEXTRA[code_ll - FIRST_LENGTH_CODE_INDEX];
+        if(numextrabits_l != 0) {
+          /* bits already ensured above */
+          pngEnsureBits25(bitReader);
+          length += pngReadBits(bitReader, numextrabits_l);
         }
-      }
-      distance = DISTANCEBASE[code_d];
 
-      /*part 4: get extra bits from distance*/
-      numextrabits_d = DISTANCEEXTRA[code_d];
-      if(numextrabits_d != 0) {
-        /* bits already ensured above */
-        distance += pngReadBits(bitReader, numextrabits_d);
-      }
+        /*part 3: get distance code*/
+        pngEnsureBits32(bitReader); /* up to 15 for the huffman symbol, up to 13 for the extra bits */
+        code_d = huffmanDecodeSymbol(bitReader, &distanceTree);
+        if(code_d > 29) return; /*error: invalid distance code (30-31 are never used)*/
 
-      /*part 5: fill in all the out[n] values based on the length and dist*/
-      start = out->len;
-      if(distance > start) return; /*too long backward distance*/
-      backward = start - distance;
+        distance = DISTANCEBASE[code_d];
 
-      out->len += length;
-      if(distance < length) {
-        size_t forward;
-        memcpy(out->data + start, out->data + backward, distance);
-        start += distance;
-        for(forward = distance; forward < length; ++forward) {
-          out->data[start++] = out->data[backward++];
+        /*part 4: get extra bits from distance*/
+        numextrabits_d = DISTANCEEXTRA[code_d];
+        if(numextrabits_d != 0) {
+          /* bits already ensured above */
+          distance += pngReadBits(bitReader, numextrabits_d);
         }
-      } else {
-        memcpy(out->data + start, out->data + backward, length);
+
+        /*part 5: fill in all the out[n] values based on the length and dist*/
+        start = out->len;
+        if(distance > start) return; /*too long backward distance*/
+        backward = start - distance;
+
+        out->len += length;
+        if(distance < length) {
+          size_t forward;
+          memcpy(out->data + start, out->data + backward, distance);
+          start += distance;
+          for(forward = distance; forward < length; ++forward) {
+            out->data[start++] = out->data[backward++];
+          }
+        } else {
+          memcpy(out->data + start, out->data + backward, length);
+        }
+      } else if(code_ll == 256) {
+        done = 1; /*end code, finish the loop*/
+      } else /*if(code_ll == INVALIDSYMBOL)*/ {
+        return; /*error: tried to read disallowed huffman symbol*/
       }
-    } else if(code_ll == 256) {
-      done = 1; /*end code, finish the loop*/
-    } else /*if(code_ll == INVALIDSYMBOL)*/ {
-      return; /*error: tried to read disallowed huffman symbol*/
-    }
-    if(out->cap - out->len < reserved_size) {
-      vector_uint8_t_realloc(out, out->len + reserved_size);
-    }
+      if(out->cap - out->len < reserved_size) {
+        vector_uint8_t_realloc(out, out->len + reserved_size);
+      }
     
-    /*error check whether bit out of bounds*/
-    if(bitReader->bp > bitReader->bitsize) {
-      return;
-    }
+      /*error check whether bit out of bounds*/
+      if(bitReader->bp > bitReader->bitsize) {
+        return;
+      }
   }
 
   HuffmanTree_cleanup(&literalLengthTree);
@@ -761,20 +779,42 @@ static void pngInflate(vector_uint8_t* out, vector_uint8_t* in, png_t* png) {
     uint8_t BFINAL = 0;
 
     while (!BFINAL) {
-        pngEnsureBits9(bitReader);
-        BFINAL = pngReadBits(bitReader, 1);
-        uint8_t BTYPE = pngReadBits(bitReader, 2);
+      pngEnsureBits9(bitReader);
+      BFINAL = pngReadBits(bitReader, 1);
+      uint8_t BTYPE = pngReadBits(bitReader, 2);
 
-        if (3 == BTYPE) {
-            /*error: reserved BTYPE*/
-            pngBitReader_cleanup(bitReader);
-            return ;
-        } else if (0 == BTYPE) {
-            pngInflateNoCompression(out, bitReader, png); /* no compression */
-        } else {
-            pngInflateHuffmanBlock(out, bitReader, BTYPE, png); /* compressed with fixed/dynamic Huffman codes */
-        }
+      if (3 == BTYPE) {
+          /*error: reserved BTYPE*/
+          pngBitReader_cleanup(bitReader);
+          return ;
+      } else if (0 == BTYPE) {
+          pngInflateNoCompression(out, bitReader, png); /* no compression */
+      } else {
+          pngInflateHuffmanBlock(out, bitReader, BTYPE, png); /* compressed with fixed/dynamic Huffman codes */
+      }
     }
+}
+
+/*Return the adler32 of the bytes data[0..len-1]*/
+static unsigned pngAdler32(const unsigned char* data, unsigned len) {
+  unsigned adler = 1u;
+  unsigned s1 = adler & 0xffffu;
+  unsigned s2 = (adler >> 16u) & 0xffffu;
+
+  while(len != 0u) {
+    unsigned i;
+    /*at least 5552 sums can be done before the sums overflow, saving a lot of module divisions*/
+    unsigned amount = len > 5552u ? 5552u : len;
+    len -= amount;
+    for(i = 0; i != amount; ++i) {
+      s1 += (*data++);
+      s2 += s1;
+    }
+    s1 %= 65521u;
+    s2 %= 65521u;
+  }
+
+  return (s2 << 16u) | s1;
 }
 
 /* 
@@ -832,6 +872,13 @@ static void pngZlibDecompressv(vector_uint8_t* out, png_t* png) {
     in.data += 2; /* skip zlib header */
     in.len -= 2;
     pngInflate(out, &in, png);
+
+    uint32_t adler32 = pngRead32bit(&in.data[in.len - 4]);
+    uint32_t checksum = pngAdler32(out->data, out->len);
+    if (checksum != adler32) {
+        /*error: adler32 checksum mismatch*/
+        return ;
+    }
 }
 
 static void pngZlibDecompress(vector_uint8_t* out, size_t expectedSize, png_t* png) {
