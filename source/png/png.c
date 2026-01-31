@@ -286,12 +286,34 @@ typedef struct HuffmanTree {
   unsigned short* table_value; /*value of symbol from lookup table, or pointer to secondary table if needed*/
 } HuffmanTree;
 
+#define FIRST_LENGTH_CODE_INDEX 257
+#define LAST_LENGTH_CODE_INDEX 285
 /*256 literals, the end code, some length codes, and 2 unused codes*/
 #define NUM_DEFLATE_CODE_SYMBOLS 288
 /*the distance codes have their own symbols, 30 used, 2 unused*/
 #define NUM_DISTANCE_SYMBOLS 32
 /*the code length codes. 0-15: code lengths, 16: copy previous 3-6 times, 17: 3-10 zeros, 18: 11-138 zeros*/
 #define NUM_CODE_LENGTH_CODES 19
+
+/*the base lengths represented by codes 257-285*/
+static const unsigned LENGTHBASE[29]
+  = {3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 15, 17, 19, 23, 27, 31, 35, 43, 51, 59,
+     67, 83, 99, 115, 131, 163, 195, 227, 258};
+
+/*the extra bits used by codes 257-285 (added to base length)*/
+static const unsigned LENGTHEXTRA[29]
+  = {0, 0, 0, 0, 0, 0, 0,  0,  1,  1,  1,  1,  2,  2,  2,  2,  3,  3,  3,  3,
+      4,  4,  4,   4,   5,   5,   5,   5,   0};
+
+/*the base backwards distances (the bits of distance codes appear after length codes and use their own huffman tree)*/
+static const unsigned DISTANCEBASE[30]
+  = {1, 2, 3, 4, 5, 7, 9, 13, 17, 25, 33, 49, 65, 97, 129, 193, 257, 385, 513,
+     769, 1025, 1537, 2049, 3073, 4097, 6145, 8193, 12289, 16385, 24577};
+
+/*the extra bits of backwards distances (added to base)*/
+static const unsigned DISTANCEEXTRA[30]
+  = {0, 0, 0, 0, 1, 1, 2,  2,  3,  3,  4,  4,  5,  5,   6,   6,   7,   7,   8,
+       8,    9,    9,   10,   10,   11,   11,   12,    12,    13,    13};
 
 static const unsigned CLCL_ORDER[NUM_CODE_LENGTH_CODES] = {16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15};
 
@@ -304,10 +326,18 @@ static void HuffmanTree_init(HuffmanTree* tree) {
     tree->table_value = NULL;
 }
 
+static void HuffmanTree_cleanup(HuffmanTree* tree) {
+  free(tree->codes);
+  free(tree->lengths);
+  free(tree->table_len);
+  free(tree->table_value);
+}
+
 #define FIRSTBITS 9u
 #define INVALIDBITS 16u
 #define INVALIDSYMBOL 65535u
 
+/* Note: it adpat fixed and dynamic huffman code */
 static void HuffmanTree_makeTable(HuffmanTree* tree) {
   static const unsigned headsize = 1u << FIRSTBITS; /*size of the first table*/
   static const unsigned mask = (1u << FIRSTBITS) - 1u;
@@ -320,13 +350,13 @@ static void HuffmanTree_makeTable(HuffmanTree* tree) {
     unsigned symbol = tree->codes[i];
     unsigned bitlen = tree->lengths[i];
     unsigned index;
-    if(bitlen <= FIRSTBITS) continue; /*symbols that fit in first table don't increase secondary table size*/
+    if(bitlen <= FIRSTBITS) continue;
     /*get the FIRSTBITS MSBs, the MSBs of the symbol are encoded first. */
     index = pngReverseBits(symbol >> (bitlen - FIRSTBITS), FIRSTBITS);
     maxlens[index] = MAX(maxlens[index], bitlen);
   }
 
-  /* compute total table size: size of first table plus all secondary tables for symbols longer than FIRSTBITS */
+  /* compute total table size: size of first table + all secondary tables(symbols >FIRSTBITS) */
   size = headsize;
   for(i = 0; i < headsize; ++i) {
     unsigned bitLen = maxlens[i];
@@ -349,9 +379,10 @@ static void HuffmanTree_makeTable(HuffmanTree* tree) {
   }
   free(maxlens);
 
-  /*fill in the first table for short symbols, or secondary table for long symbols*/
+  /*fill huffman table: the first table for short symbols and  the second table for long symbols*/
   numpresent = 0;
   for(i = 0; i < tree->numcodes; ++i) {
+
     unsigned bitLen = tree->lengths[i];
     unsigned symbol, reverse;
     if(bitLen == 0) continue;
@@ -361,13 +392,15 @@ static void HuffmanTree_makeTable(HuffmanTree* tree) {
     numpresent++;
 
     if(bitLen <= FIRSTBITS) {
-      /*short symbol, fully in first table, replicated num times if bitLen < FIRSTBITS*/
+      /*short symbol, replicated num times if bitLen < FIRSTBITS*/
       unsigned num = 1u << (FIRSTBITS - bitLen);
+      
       unsigned j;
       for(j = 0; j < num; ++j) {
         /*bit reader will read the bitLen bits of symbol first, the remaining FIRSTBITS - bitLen bits go to the MSB's*/
         unsigned index = reverse | (j << bitLen);
-        if(tree->table_len[index] != INVALIDBITS) return ; /*invalid tree: long symbol shares prefix with short symbol*/
+
+        if(tree->table_len[index] != INVALIDBITS) return ; 
         tree->table_len[index] = bitLen;
         tree->table_value[index] = (unsigned short)i;
       }
@@ -418,17 +451,14 @@ static void HuffmanTree_makeFromLengths2(HuffmanTree* tree) {
 
     for(n = 0; n != tree->maxbitlen + 1; n++) bl_count[n] = next_code[n] = 0;
 
-    /*step 1: count number of instances of each code length*/
+    /* for more details see rfc 1951 chapter 3.2.2*/
     for(bits = 0; bits != tree->numcodes; ++bits) ++bl_count[tree->lengths[bits]];
-    /*step 2: generate the nextcode values*/
     for(bits = 1; bits <= tree->maxbitlen; ++bits) {
       next_code[bits] = (next_code[bits - 1] + bl_count[bits - 1]) << 1u;
     }
-    /*step 3: generate all the codes*/
     for(n = 0; n != tree->numcodes; ++n) {
       if(tree->lengths[n] != 0) {
         tree->codes[n] = next_code[tree->lengths[n]]++;
-        /*remove superfluous bits from the code*/
         tree->codes[n] &= ((1u << tree->lengths[n]) - 1u);
       }
     }
@@ -453,12 +483,13 @@ static void generateFixedLitLenTree(HuffmanTree* tree) {
 
     unsigned* bitLen = (unsigned*)malloc(NUM_DEFLATE_CODE_SYMBOLS * sizeof(unsigned));
     memset(bitLen, 0, NUM_DEFLATE_CODE_SYMBOLS * sizeof(unsigned));
+    unsigned i;
 
     /*288 possible codes: 0-255=literals, 256=endcode, 257-285=lengthcodes, 286-287=unused*/
-    for (unsigned i = 0;   i <= 143; i++) bitLen[i] = 8;
-    for (unsigned i = 144; i <= 255; i++) bitLen[i] = 9;
-    for (unsigned i = 256; i <= 279; i++) bitLen[i] = 7;
-    for (unsigned i = 280; i <= 287; i++) bitLen[i] = 8;
+    for (i = 0;   i <= 143; i++) bitLen[i] = 8;
+    for (i = 144; i <= 255; i++) bitLen[i] = 9;
+    for (i = 256; i <= 279; i++) bitLen[i] = 7;
+    for (i = 280; i <= 287; i++) bitLen[i] = 8;
 
     HuffmanTree_makeFromLengths(tree, bitLen, NUM_DEFLATE_CODE_SYMBOLS, 15);
     free(bitLen);
@@ -466,9 +497,9 @@ static void generateFixedLitLenTree(HuffmanTree* tree) {
 
 static void generateFixedDistanceTree(HuffmanTree* tree) {
   unsigned* bitlen = (unsigned*)lodepng_malloc(NUM_DISTANCE_SYMBOLS * sizeof(unsigned));
-
+  unsigned i;
   /*there are 32 distance codes, but 30-31 are unused*/
-  for(unsigned i = 0; i != NUM_DISTANCE_SYMBOLS; ++i) bitlen[i] = 5;
+  for(i = 0; i != NUM_DISTANCE_SYMBOLS; ++i) bitlen[i] = 5;
   HuffmanTree_makeFromLengths(tree, bitlen, NUM_DISTANCE_SYMBOLS, 15);
 
   free(bitlen);
@@ -476,14 +507,14 @@ static void generateFixedDistanceTree(HuffmanTree* tree) {
 
 static unsigned huffmanDecodeSymbol(pngBitReader* reader, const HuffmanTree* codetree) {
   unsigned short code = pngPeekBits(reader, FIRSTBITS);
-  unsigned short l = codetree->table_len[code];
+  unsigned short bitLen = codetree->table_len[code];
   unsigned short value = codetree->table_value[code];
-  if(l <= FIRSTBITS) {
-    pngSkipBits(reader, l);
+  if(bitLen <= FIRSTBITS) {
+    pngSkipBits(reader, bitLen);
     return value;
   } else {
     pngSkipBits(reader, FIRSTBITS);
-    value += pngPeekBits(reader, l - FIRSTBITS);
+    value += pngPeekBits(reader, bitLen - FIRSTBITS);
     pngSkipBits(reader, codetree->table_len[value] - FIRSTBITS);
     return codetree->table_value[value];
   }
@@ -494,11 +525,17 @@ static void getTreeInflateFixed(HuffmanTree* literalLengthTree, HuffmanTree* dis
     generateFixedDistanceTree(distanceTree);
 }
 
+/*
+  dynamic huffman block format
+  ┌─────────┬─────────┬────────┬──────────────────────┬────────────────────────┬──────────────────┬─────────────────┬──────────────────────┐
+  │ HLIT    │ HDIST   │ HCLEN  │ code length alphabet │ literal/length alphabet│ distance alphabet│ compressed data │ literal/length symbol│ 
+  │ 5bit    │ 5bit    │ 4bit   │ (HCLEN+4)×3bit       │ HLIT + 257 bit         │ HDIST + 1bit     │                 │       256            │
+  └─────────┴─────────┴────────┴──────────────────────┴────────────────────────┴──────────────────┴─────────────────┴──────────────────────┘
+*/
 static void getTreeInflateDynamic(HuffmanTree* literalLengthTree, HuffmanTree* distanceTree, pngBitReader* bitReader) {
   /*make sure that length values that aren't filled in will be 0, or a wrong tree will be generated*/
   unsigned n, HLIT, HDIST, HCLEN, i;
 
-  /*see comments in deflateDynamic for explanation of the context and these variables, it is analogous*/
   unsigned* bitlen_ll = 0; /*lit,len code lengths*/
   unsigned* bitlen_d = 0; /*dist code lengths*/
   /*code length code lengths ("clcl"), the bit lengths of the huffman tree used to compress bitlen_ll and bitlen_d*/
@@ -509,66 +546,61 @@ static void getTreeInflateDynamic(HuffmanTree* literalLengthTree, HuffmanTree* d
   if(bitReader->bitsize - bitReader->bp < 14) return;
   pngEnsureBits17(bitReader);
 
-  /*number of literal/length codes + 257. Unlike the spec, the value 257 is added to it here already*/
   HLIT =  pngReadBits(bitReader, 5) + 257;
-  /*number of distance codes. Unlike the spec, the value 1 is added to it here already*/
   HDIST = pngReadBits(bitReader, 5) + 1;
-  /*number of code length codes. Unlike the spec, the value 4 is added to it here already*/
   HCLEN = pngReadBits(bitReader, 4) + 4;
 
   bitlen_cl = (unsigned*)malloc(NUM_CODE_LENGTH_CODES * sizeof(unsigned));
-  if(!bitlen_cl) return 83 /*alloc fail*/;
 
   HuffmanTree_init(&tree_cl);
 
-
-    for(i = 0; i != HCLEN; ++i) {
-    pngEnsureBits9(bitReader, 3); /*out of bounds already checked above */
+  for(i = 0; i != HCLEN; ++i) {
+    pngEnsureBits9(bitReader); /*out of bounds already checked above */
     bitlen_cl[CLCL_ORDER[i]] = pngReadBits(bitReader, 3);
-    }
-    for(i = HCLEN; i != NUM_CODE_LENGTH_CODES; ++i) {
+  }
+  for(i = HCLEN; i != NUM_CODE_LENGTH_CODES; ++i) {
     bitlen_cl[CLCL_ORDER[i]] = 0;
-    }
+  }
 
-    HuffmanTree_makeFromLengths(&tree_cl, bitlen_cl, NUM_CODE_LENGTH_CODES, 7);
+  HuffmanTree_makeFromLengths(&tree_cl, bitlen_cl, NUM_CODE_LENGTH_CODES, 7);
 
-    /*now we can use this tree to read the lengths for the tree that this function will return*/
-    bitlen_ll = (unsigned*)lodepng_malloc(NUM_DEFLATE_CODE_SYMBOLS * sizeof(unsigned));
-    bitlen_d = (unsigned*)lodepng_malloc(NUM_DISTANCE_SYMBOLS * sizeof(unsigned));
+  /*now we can use this tree to read the lengths for the tree that this function will return*/
+  bitlen_ll = (unsigned*)lodepng_malloc(NUM_DEFLATE_CODE_SYMBOLS * sizeof(unsigned));
+  bitlen_d = (unsigned*)lodepng_malloc(NUM_DISTANCE_SYMBOLS * sizeof(unsigned));
 
-    memset(bitlen_ll, 0, NUM_DEFLATE_CODE_SYMBOLS * sizeof(*bitlen_ll));
-    memset(bitlen_d, 0, NUM_DISTANCE_SYMBOLS * sizeof(*bitlen_d));
+  memset(bitlen_ll, 0, NUM_DEFLATE_CODE_SYMBOLS * sizeof(*bitlen_ll));
+  memset(bitlen_d, 0, NUM_DISTANCE_SYMBOLS * sizeof(*bitlen_d));
 
-    /*i is the current symbol we're reading in the part that contains the code lengths of lit/len and dist codes*/
-    i = 0;
-    while(i < HLIT + HDIST) {
-      unsigned code;
-      ensureBits25(bitReader, 22); /* up to 15 bits for huffman code, up to 7 extra bits below*/
-      code = huffmanDecodeSymbol(bitReader, &tree_cl);
-      if(code <= 15) /*a length code*/ {
-        if(i < HLIT) bitlen_ll[i] = code;
-        else bitlen_d[i - HLIT] = code;
+  /*i is the current symbol we're reading in the part that contains the code lengths of lit/len and dist codes*/
+  i = 0;
+  while(i < HLIT + HDIST) {
+    unsigned code;
+    pngEnsureBits25(bitReader); /* up to 15 bits for huffman code, up to 7 extra bits below*/
+    code = huffmanDecodeSymbol(bitReader, &tree_cl);
+    if(code <= 15) /*a length code*/ {
+      if(i < HLIT) bitlen_ll[i] = code;
+      else bitlen_d[i - HLIT] = code;
+      ++i;
+    } else if(code == 16) /*repeat previous*/ {
+      unsigned replength = 3; /*read in the 2 bits that indicate repeat length (3-6)*/
+      unsigned LastValue; /*set value to the previous code*/
+
+      if(i == 0) return; /*can't repeat previous if i is 0*/
+
+      replength += pngReadBits(bitReader, 2);
+
+      if(i < HLIT + 1) LastValue = bitlen_ll[i - 1];
+      else LastValue = bitlen_d[i - HLIT - 1];
+      /*repeat this value in the next lengths*/
+      for(n = 0; n < replength; ++n) {
+        if(i >= HLIT + HDIST) return; /*error: i is larger than the amount of codes*/
+        if(i < HLIT) bitlen_ll[i] = LastValue;
+        else bitlen_d[i - HLIT] = LastValue;
         ++i;
-      } else if(code == 16) /*repeat previous*/ {
-        unsigned replength = 3; /*read in the 2 bits that indicate repeat length (3-6)*/
-        unsigned value; /*set value to the previous code*/
-
-        if(i == 0) return; /*can't repeat previous if i is 0*/
-
-        replength += readBits(bitReader, 2);
-
-        if(i < HLIT + 1) value = bitlen_ll[i - 1];
-        else value = bitlen_d[i - HLIT - 1];
-        /*repeat this value in the next lengths*/
-        for(n = 0; n < replength; ++n) {
-          if(i >= HLIT + HDIST) return; /*error: i is larger than the amount of codes*/
-          if(i < HLIT) bitlen_ll[i] = value;
-          else bitlen_d[i - HLIT] = value;
-          ++i;
         }
       } else if(code == 17) /*repeat "0" 3-10 times*/ {
         unsigned replength = 3; /*read in the bits that indicate repeat length*/
-        replength += readBits(bitReader, 3);
+        replength += pngReadBits(bitReader, 3);
 
         /*repeat this value in the next lengths*/
         for(n = 0; n < replength; ++n) {
@@ -580,7 +612,7 @@ static void getTreeInflateDynamic(HuffmanTree* literalLengthTree, HuffmanTree* d
         }
       } else if(code == 18) /*repeat "0" 11-138 times*/ {
         unsigned replength = 11; /*read in the bits that indicate repeat length*/
-        replength += readBits(bitReader, 7);
+        replength += pngReadBits(bitReader, 7);
 
         /*repeat this value in the next lengths*/
         for(n = 0; n < replength; ++n) {
@@ -613,9 +645,15 @@ static void getTreeInflateDynamic(HuffmanTree* literalLengthTree, HuffmanTree* d
 
 }
 
+/*
+  huffman compressed block format, i.e LZ77 data compressed with huffman coding.
+  [symbol]...[symbol][code len][code len extra bit][distance code][distance code extra bit]......[ending code]
+*/
 static void pngInflateHuffmanBlock(vector_uint8_t* out, pngBitReader* bitReader, uint8_t BTYPE, png_t* png) {
     HuffmanTree literalLengthTree;
     HuffmanTree distanceTree;
+    const size_t reserved_size = 260; /* must be at least 258 for max length, and a few extra for adding a few extra literals */
+    int done = 0;
 
     HuffmanTree_init(&literalLengthTree);
     HuffmanTree_init(&distanceTree);
@@ -628,7 +666,88 @@ static void pngInflateHuffmanBlock(vector_uint8_t* out, pngBitReader* bitReader,
         getTreeInflateDynamic(&literalLengthTree, &distanceTree, bitReader);
     }
 
-    /* to be implemented */
+    while(!done) /*decode all symbols until end reached, breaks at end code*/ {
+    /*code_ll is literal, length or end code*/
+    unsigned code_ll;
+    /* ensure enough bits for 2 huffman code reads (15 bits each): if the first is a literal, a second literal is read at once. This
+    appears to be slightly faster, than ensuring 20 bits here for 1 huffman symbol and the potential 5 extra bits for the length symbol.*/
+    pngEnsureBits32(bitReader);
+    code_ll = huffmanDecodeSymbol(bitReader, &literalLengthTree);
+    if(code_ll <= 255) {
+      /*slightly faster code path if multiple literals in a row*/
+      out->data[out->len++] = (unsigned char)code_ll;
+      code_ll = huffmanDecodeSymbol(bitReader, &literalLengthTree);
+    }
+    if(code_ll <= 255) /*literal symbol*/ {
+      out->data[out->len++] = (unsigned char)code_ll;
+    } else if(code_ll >= FIRST_LENGTH_CODE_INDEX && code_ll <= LAST_LENGTH_CODE_INDEX) /*length code*/ {
+      unsigned code_d, distance;
+      unsigned numextrabits_l, numextrabits_d; /*extra bits for length and distance*/
+      size_t start, backward, length;
+
+      /*part 1: get length base*/
+      length = LENGTHBASE[code_ll - FIRST_LENGTH_CODE_INDEX];
+
+      /*part 2: get extra bits and add the value of that to length*/
+      numextrabits_l = LENGTHEXTRA[code_ll - FIRST_LENGTH_CODE_INDEX];
+      if(numextrabits_l != 0) {
+        /* bits already ensured above */
+        pngEnsureBits25(bitReader);
+        length += pngReadBits(bitReader, numextrabits_l);
+      }
+
+      /*part 3: get distance code*/
+      pngEnsureBits32(bitReader); /* up to 15 for the huffman symbol, up to 13 for the extra bits */
+      code_d = huffmanDecodeSymbol(bitReader, &distanceTree);
+      if(code_d > 29) {
+        if(code_d <= 31) {
+          return; /*error: invalid distance code (30-31 are never used)*/
+        } else /* if(code_d == INVALIDSYMBOL) */{
+          return; /*error: tried to read disallowed huffman symbol*/
+        }
+      }
+      distance = DISTANCEBASE[code_d];
+
+      /*part 4: get extra bits from distance*/
+      numextrabits_d = DISTANCEEXTRA[code_d];
+      if(numextrabits_d != 0) {
+        /* bits already ensured above */
+        distance += pngReadBits(bitReader, numextrabits_d);
+      }
+
+      /*part 5: fill in all the out[n] values based on the length and dist*/
+      start = out->len;
+      if(distance > start) return; /*too long backward distance*/
+      backward = start - distance;
+
+      out->len += length;
+      if(distance < length) {
+        size_t forward;
+        memcpy(out->data + start, out->data + backward, distance);
+        start += distance;
+        for(forward = distance; forward < length; ++forward) {
+          out->data[start++] = out->data[backward++];
+        }
+      } else {
+        memcpy(out->data + start, out->data + backward, length);
+      }
+    } else if(code_ll == 256) {
+      done = 1; /*end code, finish the loop*/
+    } else /*if(code_ll == INVALIDSYMBOL)*/ {
+      return; /*error: tried to read disallowed huffman symbol*/
+    }
+    if(out->cap - out->len < reserved_size) {
+      vector_uint8_t_realloc(out, out->len + reserved_size);
+    }
+    
+    /*error check whether bit out of bounds*/
+    if(bitReader->bp > bitReader->bitsize) {
+      return;
+    }
+  }
+
+  HuffmanTree_cleanup(&literalLengthTree);
+  HuffmanTree_cleanup(&distanceTree);
 }
 /*
  deflate compressed data format (for each block)
