@@ -1,5 +1,8 @@
 #include "pmxFile.h"
 
+/* for more detail see
+https://github.com/benikabocha/saba/blob/master/src/Saba/Model/MMD/PMXFile.cpp */
+
 static void pmxRead(void* buffer, uint32_t size, FILE* fd) {
     read_file_bytes(buffer, size, fd);
 }

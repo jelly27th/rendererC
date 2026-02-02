@@ -1,14 +1,12 @@
 #ifndef _PMXFILE_H
 #define _PMXFILE_H
 
-#include <stdio.h>
-#include <stdlib.h>
 #include <stdbool.h>
-#include <string.h>
 #include <locale.h>
 #include <math.h>
 #include "../vector/vector.h"
 #include "../type/type.h"
+#include "../utils/utils.h"
 
 /* pmx header struct */
 typedef struct

@@ -2,7 +2,6 @@
 #define _BMPFILE_H
 
 #include "../type/type.h"
-#include <stdio.h>
 
 typedef struct {
     uint8_t  bfType[2];       // 2 bytes: "BM"
