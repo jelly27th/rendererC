@@ -37,5 +37,12 @@
         }                                                               \
         vec->data[vec->len - 1] = value;                                \
     }                                                                   \
+    void vector_##T##_realloc(vector_##T* vec, int newCap) {            \
+        if (newCap > vec->cap) {                                        \
+            /* grow 1.5 times */                                        \
+            vec->cap = newCap + (vec->cap >> 1);                        \
+            vec->data = (T*)realloc(vec->data, sizeof(T) * vec->cap);   \
+        }                                                               \
+    }                                                                   \
 
 #endif

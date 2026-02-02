@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include "vector/vector.h"
+#include "dyarray/dyarray.h"
 
 UseVector(char)
 

@@ -1,4 +1,4 @@
-#include "bmp.h"
+#include "bmpFile.h"
 
 static void bmpRead(void* buffer, uint32_t size, FILE* fd) {
     memset(buffer, 0, size);
