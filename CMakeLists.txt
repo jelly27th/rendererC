@@ -4,9 +4,9 @@ project(Renderer)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
-set(MINGW_PATH "C:/MinGW")
-set(CMAKE_C_COMPILER "${MINGW_PATH}/bin/gcc")
-set(CMAKE_CXX_COMPILER "${MINGW_PATH}/bin/g++")
+# set(MINGW_PATH "C:/MinGW")
+# set(CMAKE_C_COMPILER "${MINGW_PATH}/bin/gcc")
+# set(CMAKE_CXX_COMPILER "${MINGW_PATH}/bin/g++")
 
 set(HEADER_FILES
     source/utils/utils.h
