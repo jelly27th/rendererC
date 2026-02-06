@@ -7,8 +7,6 @@
 #include "source/pmx/pmxFile.h"
 #include "source/camera/orbitCamera.h"
 #include "source/log/log.h"
-#include "source/gltf/gltf.h"
-#include "source/png/png.h"
 
 int main() {
   
@@ -31,10 +29,7 @@ int main() {
   record_t record = {0};
   setUserData(window, &record);
 
-  /* load your model */
   pmx_t* pmx = pmxReadFile("xiao\\xiao.pmx");
-  cgltf_data* data = gltfLoadFromFile("nickelodeon_kart_racers_3_jenny\\scene.gltf");
-
   while (!window->isClose) {
 
     startFrameRateTickMS(window);
@@ -108,7 +103,6 @@ int main() {
 
   destroyFramebuffer(framebuffer);
   destroy_orbit_camera(camera);
-  gltfFree(data);
-  
+
   return 0;
 }

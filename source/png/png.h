@@ -1,6 +1,7 @@
+#ifndef PNG_H
+#define PNG_H
 
-#include "type.h"
-#include <stdio.h>
+#include "../type/type.h"
 #include "../thirdparty/lodepng/lodepng.h"
 
 typedef struct {
@@ -10,3 +11,5 @@ typedef struct {
 
 void pngDecode(const char* filename , png_t* png);
 void pngFree(png_t* png);
+
+#endif

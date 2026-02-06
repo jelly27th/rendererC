@@ -1,8 +1,4 @@
 #include "png.h"
-#include <string.h>
-#include <stdlib.h>
-#include "../utils/utils.h"
-#include "../dyarray/dyarray.h"
 
 /* https://en.wikipedia.org/wiki/PNG */
 /* https://www.libpng.org/pub/png/spec/1.2/PNG-Chunks.html */
@@ -13,14 +9,14 @@ void pngDecode(const char* filename, png_t* png) {
   unsigned error;
   unsigned char* image = 0;
   unsigned width, height;
-  unsigned char* png = 0;
+  unsigned char* _png = 0;
   size_t pngsize;
 
-  error = lodepng_load_file(&png, &pngsize, filename);
-  if(!error) error = lodepng_decode32(&image, &width, &height, png, pngsize);
+  error = lodepng_load_file(&_png, &pngsize, filename);
+  if(!error) error = lodepng_decode32(&image, &width, &height, _png, pngsize);
   if(error) printf("error %u: %s\n", error, lodepng_error_text(error));
 
-  free(png);
+  free(_png);
 
   /*use image here*/
   png->width = width;
