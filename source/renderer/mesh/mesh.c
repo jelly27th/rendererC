@@ -1,10 +1,18 @@
 #include "mesh.h"
+#include <direct.h>
 #include "../../common/type.h"
 #include "../../thirdparty/fast_obj/fast_obj.h"
 
 static mesh_t* obj_mesh_load(const char* filePath) {
+
+    char curPath[FILENAME_MAX] = {0};
+    char subStr[] = "build";
+    _getcwd(curPath, sizeof(curPath));
+    char *position = strstr(curPath, subStr);
+    memcpy(position, filePath, strlen(filePath));
+
     mesh_t* mesh = (mesh_t*)malloc(sizeof(mesh_t));
-    fastObjMesh* obj = fast_obj_read(filePath);
+    fastObjMesh* obj = fast_obj_read(curPath);
 
     /* load vertex */
     mesh->vertexCount = obj->position_count;

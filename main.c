@@ -27,7 +27,7 @@ int main() {
   setUserData(window, &record);
 
   /* load your model */
-  mesh_t* mesh = mesh_load("D:\\UID03408\\Desktop\\code\\rendererC\\assets\\Jenny\\Jenny.obj"); 
+  mesh_t* mesh = mesh_load("assets\\Jenny\\Jenny.obj"); 
   while (!window->isClose) {
 
     startFrameRateTickMS(window);
