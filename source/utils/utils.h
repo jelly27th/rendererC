@@ -2,7 +2,7 @@
 #define _UTILS_H
 
 #include "../point/point.h"
-#include "../type/type.h"
+#include "../common/type.h"
 #include <stdio.h>
 
 #define EPSILON 1e-5f

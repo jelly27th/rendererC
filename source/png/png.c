@@ -1,4 +1,5 @@
 #include "png.h"
+#include "../thirdparty/lodepng/lodepng.h"
 
 /* https://en.wikipedia.org/wiki/PNG */
 /* https://www.libpng.org/pub/png/spec/1.2/PNG-Chunks.html */
@@ -12,9 +13,9 @@ void pngDecode(const char* filename, png_t* png) {
   unsigned char* _png = 0;
   size_t pngsize;
 
-  error = lodepng_load_file(&_png, &pngsize, filename);
-  if(!error) error = lodepng_decode32(&image, &width, &height, _png, pngsize);
-  if(error) printf("error %u: %s\n", error, lodepng_error_text(error));
+  //error = lodepng_load_file(&_png, &pngsize, filename);
+  //if(!error) error = lodepng_decode32(&image, &width, &height, _png, pngsize);
+  //if(error) printf("error %u: %s\n", error, lodepng_error_text(error));
 
   free(_png);
 

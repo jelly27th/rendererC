@@ -1,12 +1,16 @@
-#include <stdio.h>
-
-#include "source/api.h"
-
-#define GRAPHICS_IMPLEMENTATION 1
+#include "source/win32/win32.h"
+#include "source/win32/callback.h"
+#include "source/vector/vector.h"
+#include "source/matrix/matrix.h"
+#include "source/framebuffer/framebuffer.h"
+#include "source/graphics/graphics.h"
+#include "source/pmx/pmxFile.h"
+#include "source/camera/orbitCamera.h"
+#include "source/log/log.h"
+#include "source/png/png.h"
 
 int main() {
 
-#if (1 == GRAPHICS_IMPLEMENTATION)
   windows_t* window = initWindow(700, 700);
   if (window == NULL) {
     return 0;
@@ -27,7 +31,8 @@ int main() {
   setUserData(window, &record);
 
   /* load your model */
-  mesh_t* mesh = mesh_load("D:\\UID03408\\Desktop\\code\\rendererC\\assets\\Jenny\\Jenny.obj"); 
+  pmx_t* pmx = pmxReadFile("xiao\\xiao.pmx");
+
   while (!window->isClose) {
 
     startFrameRateTickMS(window);
@@ -38,28 +43,24 @@ int main() {
 
     matrix4x4_t viewport = matrix4x4_viewport(window->width, window->height);
     matrix4x4_t vp = get_view_projection_matrix(camera);
-    matrix4x4_t model = matrix4x4_scale(10.0f, 10.0f, 10.0f);
 
     memset(framebuffer->color_buffer, 0, sizeof(color_t) * framebuffer->width * framebuffer->height);
     
-    int i;
-    for ( i= 0; i < mesh->indexCount; i++) {
-          //printf("index_count %d: (%d, %d, %d)\n", i, mesh->indices[i*3].vertexIdx, mesh->indices[i*3+1].vertexIdx, mesh->indices[i*3+2].vertexIdx);
-          int index1 = mesh->indices[i*3].vertexIdx;
-          int index2 = mesh->indices[i*3+1].vertexIdx;
-          int index3 = mesh->indices[i*3+2].vertexIdx;
-          vector3d_t v0 = mesh->vertices[index1]; 
-          vector3d_t v1 = mesh->vertices[index2];
-          vector3d_t v2 = mesh->vertices[index3];
+    for (int i = 0; i < pmx->face.count; i++) {
+          int index1 = pmx->face.data[i].indices[0];
+          int index2 = pmx->face.data[i].indices[1];
+          int index3 = pmx->face.data[i].indices[2];
+          pmx_vertex_data_t* vertex1 = &pmx->vertex.data[index1];
+          pmx_vertex_data_t* vertex2 = &pmx->vertex.data[index2];
+          pmx_vertex_data_t* vertex3 = &pmx->vertex.data[index3];
+          vector3d_t v0 = vertex1->position; 
+          vector3d_t v1 = vertex2->position;
+          vector3d_t v2 = vertex3->position;
           color_t color = {255, 0, 0, 255}; // Red color
 
           vector4d_t v0_clip = {v0.x, v0.y, v0.z, 1.0f};
           vector4d_t v1_clip = {v1.x, v1.y, v1.z, 1.0f};
           vector4d_t v2_clip = {v2.x, v2.y, v2.z, 1.0f};
-          v0_clip = matrix4x4_mult_4x1(model, v0_clip);
-          v1_clip = matrix4x4_mult_4x1(model, v1_clip);
-          v2_clip = matrix4x4_mult_4x1(model, v2_clip);
-
           v0_clip = matrix4x4_mult_4x1(vp, v0_clip);
           v1_clip = matrix4x4_mult_4x1(vp, v1_clip);
           v2_clip = matrix4x4_mult_4x1(vp, v2_clip);
@@ -86,7 +87,6 @@ int main() {
     record.orbit_delta = (vector2d_t){0, 0};
     record.pan_delta = (vector2d_t){0, 0};
     record.dolly_delta = 0;
-    printf("index_count %d \n", i);
     #else
 
     point2d_t p0 = {100, 100};
@@ -106,17 +106,6 @@ int main() {
 
   destroyFramebuffer(framebuffer);
   destroy_orbit_camera(camera);
-#else
-  fastObjMesh* mesh = fast_obj_read("D:\\UID03408\\Desktop\\code\\rendererC\\assets\\Jenny\\Jenny.obj");
-  
-  printf("index_count: %u\n", mesh->index_count);
-  // for (unsigned int i = 0; i < mesh->index_count; i++) {
-      unsigned int i = mesh->index_count-3;
-      printf("index_count %u: (%d, %d, %d)\n", i, mesh->indices[i].p, mesh->indices[i].t, mesh->indices[i].n);
-      // printf("index_count %u: (%d, %d, %d)\n", i+1, mesh->indices[i+1].p, mesh->indices[i+1].t, mesh->indices[i+1].n);
-      // printf("index_count %u: (%d, %d, %d)\n", i+2, mesh->indices[i+2].p, mesh->indices[i+2].t, mesh->indices[i+2].n);
-  // }
 
-#endif
   return 0;
 }
