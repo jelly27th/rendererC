@@ -1,7 +1,7 @@
 #ifndef _CALLBACK_H
 #define _CALLBACK_H
 
-#include "../vector/vector.h"
+#include "../maths/vector/vector.h"
 #include "../camera/orbitCamera.h"
 #include "win32.h"
 

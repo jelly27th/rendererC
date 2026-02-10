@@ -1,6 +1,9 @@
 #ifndef _MATHS_H
 #define _MATHS_H
 
+#include "vector/vector.h"
+#include "matrix/matrix.h"
+
 #include "../point/point.h"
 
 point3d_t barycentric(point2d_t p, point2d_t v1, point2d_t v2, point2d_t v3);

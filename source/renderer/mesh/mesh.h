@@ -1,7 +1,7 @@
 #ifndef _MESH_H
 #define _MESH_H
 
-#include "../../vector/vector.h"
+#include "../../maths/maths.h"
 
 typedef struct {
     unsigned int vertexIdx;

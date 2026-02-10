@@ -18,7 +18,7 @@ static mesh_t* obj_mesh_load(const char* filePath) {
     mesh->vertexCount = obj->position_count;
     mesh->vertices = (vector3d_t*)malloc(sizeof(vector3d_t) * mesh->vertexCount);
     memset(mesh->vertices, 0, sizeof(vector3d_t) * mesh->vertexCount);
-    for (unsigned int i = 0; i < mesh->vertexCount; i++) {
+    for (unsigned int i = 1; i < mesh->vertexCount; i++) {
         mesh->vertices[i].x = obj->positions[i * 3];
         mesh->vertices[i].y = obj->positions[i * 3 + 1];
         mesh->vertices[i].z = obj->positions[i * 3 + 2];

@@ -3,11 +3,13 @@
 #include "source/api.h"
 
 #define GRAPHICS_IMPLEMENTATION 1
+#define GRAPHICS_LINE_MODE 0
+#define GRAPHICS_LIGHTING_MODE 1
 
 int main() {
 
 #if (1 == GRAPHICS_IMPLEMENTATION)
-  windows_t* window = initWindow(700, 700);
+  windows_t* window = initWindow(500, 500);
   if (window == NULL) {
     return 0;
   }
@@ -27,18 +29,18 @@ int main() {
   setUserData(window, &record);
 
   /* load your model */
-  mesh_t* mesh = mesh_load("assets\\Jenny\\Jenny.obj"); 
+  mesh_t* mesh = mesh_load("assets\\rock\\rock.obj");
+
   while (!window->isClose) {
 
     startFrameRateTickMS(window);
 
-    #if 1
     /* Render your scene here start */
     orbitCamera_update(window, camera, &record);
 
     matrix4x4_t viewport = matrix4x4_viewport(window->width, window->height);
     matrix4x4_t vp = get_view_projection_matrix(camera);
-    matrix4x4_t model = matrix4x4_scale(10.0f, 10.0f, 10.0f);
+    matrix4x4_t model = matrix4x4_scale(5.0f, 5.0f, 5.0f);
 
     memset(framebuffer->color_buffer, 0, sizeof(color_t) * framebuffer->width * framebuffer->height);
     
@@ -51,7 +53,17 @@ int main() {
           vector3d_t v0 = mesh->vertices[index1]; 
           vector3d_t v1 = mesh->vertices[index2];
           vector3d_t v2 = mesh->vertices[index3];
-          color_t color = {255, 0, 0, 255}; // Red color
+          
+          // if (v0.x == 0 && v0.y == 0 && v0.z == 0) {
+          //     printf("v0 have zero vertex, %f, %f, %f\n", mesh->vertices[index1].x, mesh->vertices[index1].y, mesh->vertices[index1].z);
+          // }
+          // if (v1.x == 0 && v1.y == 0 && v1.z == 0) {
+          //     printf("v1 have zero vertex, %f, %f, %f\n", mesh->vertices[index2].x, mesh->vertices[index2].y, mesh->vertices[index2].z);   
+          // }
+          // if (v2.x == 0 && v2.y == 0 && v2.z == 0) {
+          //     printf("v2 have zero vertex, %f, %f, %f\n", mesh->vertices[index3].x, mesh->vertices[index3].y, mesh->vertices[index3].z);
+          // }
+          color_t color = {255, 255, 255, 255}; // Red color
 
           vector4d_t v0_clip = {v0.x, v0.y, v0.z, 1.0f};
           vector4d_t v1_clip = {v1.x, v1.y, v1.z, 1.0f};
@@ -59,6 +71,25 @@ int main() {
           v0_clip = matrix4x4_mult_4x1(model, v0_clip);
           v1_clip = matrix4x4_mult_4x1(model, v1_clip);
           v2_clip = matrix4x4_mult_4x1(model, v2_clip);
+
+          #if (1 == GRAPHICS_LIGHTING_MODE)
+            vector3d_t light_dir = {0, 5, 10};
+            vector3d_t edge1 = vector3d_Sub(vector4d_2_vector3d(v1_clip), vector4d_2_vector3d(v0_clip));
+            vector3d_t edge2 = vector3d_Sub(vector4d_2_vector3d(v2_clip), vector4d_2_vector3d(v0_clip));
+            vector3d_t normal = vector3d_Normalize(vector3d_Cross(edge1, edge2));
+            if (normal.z < 0) {
+                normal.x = -normal.x;
+                normal.y = -normal.y;
+                normal.z = -normal.z;
+            }
+            light_dir = vector3d_Normalize(light_dir);
+            float diff = MAX((vector3d_Dot(light_dir, normal)*0.5+0.5), 0.0f);
+            
+            color.r = (uint8_t)((float)color.r * diff);
+            color.g = (uint8_t)((float)color.g * diff);
+            color.b = (uint8_t)((float)color.b * diff);
+            
+          #endif
 
           v0_clip = matrix4x4_mult_4x1(vp, v0_clip);
           v1_clip = matrix4x4_mult_4x1(vp, v1_clip);
@@ -73,6 +104,7 @@ int main() {
               v2_ndc.x < -1.0f || v2_ndc.x > 1.0f || v2_ndc.y < -1.0f || v2_ndc.y > 1.0f) {
               continue;
           }
+
           vector4d_t window_v0 = matrix4x4_mult_4x1(viewport, v0_ndc);
           vector4d_t window_v1 = matrix4x4_mult_4x1(viewport, v1_ndc);
           vector4d_t window_v2 = matrix4x4_mult_4x1(viewport, v2_ndc);
@@ -80,21 +112,22 @@ int main() {
           point2d_t p0 = {ceil(window_v0.x), ceil(window_v0.y)};
           point2d_t p1 = {ceil(window_v1.x), ceil(window_v1.y)};
           point2d_t p2 = {ceil(window_v2.x), ceil(window_v2.y)};
-          graphics_draw_Triangle(p0, p1, p2, &color, framebuffer);
+          #if (1 == GRAPHICS_LINE_MODE)
+            line2d_t line1 = {p0, p1};
+            line2d_t line2 = {p1, p2};
+            line2d_t line3 = {p2, p0};
+            draw2d_Line(line1, &color, framebuffer);
+            draw2d_Line(line2, &color, framebuffer);
+            draw2d_Line(line3, &color, framebuffer);
+          #else
+            graphics_draw_Triangle(p0, p1, p2, &color, framebuffer);
+          #endif
     }
 
     record.orbit_delta = (vector2d_t){0, 0};
     record.pan_delta = (vector2d_t){0, 0};
     record.dolly_delta = 0;
-    printf("index_count %d \n", i);
-    #else
 
-    point2d_t p0 = {100, 100};
-    point2d_t p1 = {500, 300};
-    point2d_t p2 = {300, 500};
-    color_t color = {0, 255, 0, 255}; // Green color
-    graphics_draw_Triangle(p0, p1, p2, &color, framebuffer);
-    #endif
     /* Render your scene here end */
     drawScreen(window, framebuffer);
     fillScreen(window);

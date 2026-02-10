@@ -1,8 +1,7 @@
 #ifndef _ORBITCAMERA_H
 #define _ORBITCAMERA_H
 
-#include "../vector/vector.h"
-#include "../matrix/matrix.h"
+#include "../maths/maths.h"
 
 typedef struct {
     vector2d_t orbit;

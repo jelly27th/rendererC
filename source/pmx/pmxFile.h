@@ -2,7 +2,7 @@
 #define _PMXFILE_H
 
 #include <math.h>
-#include "../vector/vector.h"
+#include "../maths/maths.h"
 #include "../common/type.h"
 #include "../utils/utils.h"
 

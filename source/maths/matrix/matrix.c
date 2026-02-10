@@ -1,5 +1,5 @@
 #include "matrix.h"
-#include "../utils/utils.h"
+#include "../../utils/utils.h"
 
 matrix4x4_t matrix4x4_identity() {
     matrix4x4_t m = {0};

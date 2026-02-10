@@ -1,6 +1,14 @@
 #include "vector.h"
 #include <math.h>
 
+vector3d_t vector4d_2_vector3d(vector4d_t v) {
+    vector3d_t v3d;
+    v3d.x = v.x;
+    v3d.y = v.y;
+    v3d.z = v.z;
+    return v3d;
+}
+
 /*                  ----> */
 /* create  a vector vbva  */
 vector3d_t vector3d_Sub(vector3d_t va, vector3d_t vb) {
@@ -64,6 +72,10 @@ vector3d_t vector3d_Add(vector3d_t va, vector3d_t vb) {
     vsum.z = va.z + vb.z;
     return(vsum);
 } 
+
+float vector3d_Dot(vector3d_t va, vector3d_t vb) {
+    return( (va.x * vb.x) + (va.y * vb.y) + (va.z * vb.z) );
+}
 
 vector2d_t vector2d_Add(vector2d_t va, vector2d_t vb) {
     vector2d_t vsum;
