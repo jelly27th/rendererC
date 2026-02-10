@@ -1,5 +1,5 @@
 #include "point.h"
-#include "../maths/maths.h"
+#include "../maths.h"
 
 point2d_t point2d_min(point2d_t p1, point2d_t p2) {
     point2d_t result;

@@ -3,7 +3,6 @@
 
 #include "../maths/maths.h"
 #include <stdio.h>
-#include "../point/point.h"
 
 void printMatrix4x4(const matrix4x4_t* matrix);
 void printVector2d(const char* str, const vector2d_t* vec);

@@ -61,7 +61,7 @@ void orbitCamera_update(windows_t* window, orbit_camera_t* camera, record_t* rec
     }
 
     if (getKeyState(window, KEY_SPACE)) {
-        set_orbitCamera(camera, (vector3d_t){0, 25, 25}, (vector3d_t){0, 5, -10});
+        set_orbitCamera(camera, (vector3d_t){0, 12, 5}, (vector3d_t){0, 0, 0});
     } else {
         motion_t motion = {0};
         motion.orbit = record->orbit_delta;

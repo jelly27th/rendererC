@@ -5,7 +5,7 @@
 #include <stdbool.h>
 #include <windows.h>
 
-#include "../framebuffer/framebuffer.h"
+#include "../renderer/framebuffer/framebuffer.h"
 
 typedef enum {
   KEY_A,

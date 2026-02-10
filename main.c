@@ -9,7 +9,7 @@
 int main() {
 
 #if (1 == GRAPHICS_IMPLEMENTATION)
-  windows_t* window = initWindow(500, 500);
+  windows_t* window = initWindow(800, 800);
   if (window == NULL) {
     return 0;
   }
@@ -24,12 +24,12 @@ int main() {
   createScreen(window);
   setFrameRate(window, 60);
 
-  orbit_camera_t* camera = create_orbit_camera((vector3d_t){0, 25, 25}, (vector3d_t){0, 5, -10}, (float)window->width / (float)window->height);
+  orbit_camera_t* camera = create_orbit_camera((vector3d_t){0, 12, 5}, (vector3d_t){0, 0, 0}, (float)window->width / (float)window->height);
   record_t record = {0};
   setUserData(window, &record);
 
   /* load your model */
-  mesh_t* mesh = mesh_load("assets\\rock\\rock.obj");
+  mesh_t* mesh = mesh_load("assets\\common\\sphere.obj");
 
   while (!window->isClose) {
 
@@ -40,7 +40,7 @@ int main() {
 
     matrix4x4_t viewport = matrix4x4_viewport(window->width, window->height);
     matrix4x4_t vp = get_view_projection_matrix(camera);
-    matrix4x4_t model = matrix4x4_scale(5.0f, 5.0f, 5.0f);
+    matrix4x4_t model = matrix4x4_scale(2.0f, 2.0f, 2.0f);
 
     memset(framebuffer->color_buffer, 0, sizeof(color_t) * framebuffer->width * framebuffer->height);
     
@@ -54,16 +54,7 @@ int main() {
           vector3d_t v1 = mesh->vertices[index2];
           vector3d_t v2 = mesh->vertices[index3];
           
-          // if (v0.x == 0 && v0.y == 0 && v0.z == 0) {
-          //     printf("v0 have zero vertex, %f, %f, %f\n", mesh->vertices[index1].x, mesh->vertices[index1].y, mesh->vertices[index1].z);
-          // }
-          // if (v1.x == 0 && v1.y == 0 && v1.z == 0) {
-          //     printf("v1 have zero vertex, %f, %f, %f\n", mesh->vertices[index2].x, mesh->vertices[index2].y, mesh->vertices[index2].z);   
-          // }
-          // if (v2.x == 0 && v2.y == 0 && v2.z == 0) {
-          //     printf("v2 have zero vertex, %f, %f, %f\n", mesh->vertices[index3].x, mesh->vertices[index3].y, mesh->vertices[index3].z);
-          // }
-          color_t color = {255, 255, 255, 255}; // Red color
+          color_t color = {255, 255, 255, 255}; // white color
 
           vector4d_t v0_clip = {v0.x, v0.y, v0.z, 1.0f};
           vector4d_t v1_clip = {v1.x, v1.y, v1.z, 1.0f};
@@ -73,22 +64,23 @@ int main() {
           v2_clip = matrix4x4_mult_4x1(model, v2_clip);
 
           #if (1 == GRAPHICS_LIGHTING_MODE)
-            vector3d_t light_dir = {0, 5, 10};
+            /* half Lambert model */
+            float kd = 1.0f; // Diffuse reflection coefficient
+            float ambient = 0.5f; // Ambient light intensity
+            vector3d_t light_dir = {0, 10, 10};
             vector3d_t edge1 = vector3d_Sub(vector4d_2_vector3d(v1_clip), vector4d_2_vector3d(v0_clip));
             vector3d_t edge2 = vector3d_Sub(vector4d_2_vector3d(v2_clip), vector4d_2_vector3d(v0_clip));
-            vector3d_t normal = vector3d_Normalize(vector3d_Cross(edge1, edge2));
-            if (normal.z < 0) {
-                normal.x = -normal.x;
-                normal.y = -normal.y;
-                normal.z = -normal.z;
-            }
             light_dir = vector3d_Normalize(light_dir);
-            float diff = MAX((vector3d_Dot(light_dir, normal)*0.5+0.5), 0.0f);
             
-            color.r = (uint8_t)((float)color.r * diff);
-            color.g = (uint8_t)((float)color.g * diff);
-            color.b = (uint8_t)((float)color.b * diff);
+            vector3d_t normal = vector3d_Normalize(vector3d_Cross(edge2, edge1));
             
+            float diff = (vector3d_Dot(light_dir, normal)*0.5) + 0.5;
+            diff = ambient + (1.0f - ambient) * diff;
+
+            color.r = (uint8_t)((float)color.r * kd * diff);
+            color.g = (uint8_t)((float)color.g * kd * diff);
+            color.b = (uint8_t)((float)color.b * kd * diff);
+
           #endif
 
           v0_clip = matrix4x4_mult_4x1(vp, v0_clip);

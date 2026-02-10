@@ -1,7 +1,7 @@
 #ifndef _FRAMEBUFFER_H
 #define _FRAMEBUFFER_H
 
-#include "../color/color.h"
+#include "../../color/color.h"
 
 typedef struct {
     int width, height;

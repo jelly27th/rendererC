@@ -1,7 +1,7 @@
 #ifndef _UTILS_H
 #define _UTILS_H
 
-#include "../point/point.h"
+#include "../maths/maths.h"
 #include "../common/type.h"
 #include <stdio.h>
 

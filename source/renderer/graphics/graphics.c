@@ -1,5 +1,5 @@
 #include "graphics.h"
-#include "../utils/utils.h"
+#include "../../utils/utils.h"
 #include <stdbool.h>
 
 void draw2d_Point(point2d_t start, color_t *color, framebuffer_t* framebuffer) {
@@ -102,7 +102,7 @@ void graphics_draw_Triangle(point2d_t p0, point2d_t p1, point2d_t p2, color_t* c
       point3d_t barycoord = barycentric(p, p0, p1, p2);
       // handling accuracy issues. 
       // if `-0.01` is `0`, maybe some point from model will discard in rendering.
-      if (barycoord.x < 0.0|| barycoord.y < 0.0 || barycoord.z < 0.0) {
+      if (barycoord.x < -0.01|| barycoord.y < -0.01 || barycoord.z < -0.01) {
         continue; 
       }
       draw2d_Point(p, color, framebuffer);

@@ -1,0 +1,16 @@
+/* half Lambert model */
+float kd = 1.0f; // Diffuse reflection coefficient
+float ambient = 0.5f; // Ambient light intensity
+vector3d_t light_dir = {0, 10, 10};
+vector3d_t edge1 = vector3d_Sub(vector4d_2_vector3d(v1_clip), vector4d_2_vector3d(v0_clip));
+vector3d_t edge2 = vector3d_Sub(vector4d_2_vector3d(v2_clip), vector4d_2_vector3d(v0_clip));
+light_dir = vector3d_Normalize(light_dir);
+
+vector3d_t normal = vector3d_Normalize(vector3d_Cross(edge2, edge1));
+
+float diff = (vector3d_Dot(light_dir, normal)*0.5) + 0.5;
+diff = ambient + (1.0f - ambient) * diff;
+
+color.r = (uint8_t)((float)color.r * kd * diff);
+color.g = (uint8_t)((float)color.g * kd * diff);
+color.b = (uint8_t)((float)color.b * kd * diff);
